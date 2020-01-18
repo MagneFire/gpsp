@@ -33,6 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <memory.h>
 #include <unistd.h>
 #include <hwcomposer_window.h>
+#include <hardware/hardware.h>
+#include <hardware/hwcomposer.h>
+#include <malloc.h>
+#include <sync/sync.h>
 
 static uint32_t frame_width = 0;
 static uint32_t frame_height = 0;
@@ -136,6 +140,20 @@ void HWComposer::present(HWComposerNativeWindowBuffer *buffer)
 		close(oldretire);
 	}
 } 
+
+inline static uint32_t interpreted_version(hw_device_t *hwc_device)
+{
+	uint32_t version = hwc_device->version;
+
+	if ((version & 0xffff0000) == 0) {
+		// Assume header version is always 1
+		uint32_t header_version = 1;
+
+		// Legacy version encoding
+		version = (version << 16) | header_version;
+	}
+	return version;
+}
 
 void Create_uvs(GLfloat * matrix, GLfloat max_u, GLfloat max_v) {
     memset(matrix,0,sizeof(GLfloat)*8);
@@ -283,7 +301,8 @@ static uint32_t screen_height = 0;
 static EGLDisplay display = NULL;
 static EGLSurface surface = NULL;
 static EGLContext context = NULL;
-static EGL_DISPMANX_WINDOW_T nativewindow;
+static HWComposer *win = NULL;
+//static EGL_DISPMANX_WINDOW_T nativewindow;
 
 static GLfloat proj[4][4];
 static GLint filter_min;
@@ -306,9 +325,7 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
 
 	frame_width = _width;
 	frame_height = _height;
-	
 
-	EGLDisplay display;
 	EGLConfig ecfg;
 	EGLint num_config;
 	EGLint attr[] = {       // some attributes to set up our egl-interface
@@ -317,12 +334,10 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
 		EGL_OPENGL_ES2_BIT,
 		EGL_NONE
 	};
-	EGLSurface surface;
 	EGLint ctxattr[] = {
 		EGL_CONTEXT_CLIENT_VERSION, 2,
 		EGL_NONE
 	};
-	EGLContext context;
 
 	EGLBoolean rv;
 
@@ -331,15 +346,15 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
         hw_module_t const* module = NULL;
         err = hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module);
         assert(err == 0);
-        framebuffer_device_t* fbDev = NULL;
-        framebuffer_open(module, &fbDev);
+        //framebuffer_device_t* fbDev = NULL;
+        //framebuffer_open(module, &fbDev);
 
 	hw_module_t *hwcModule = 0;
 	hwc_composer_device_1_t *hwcDevicePtr = 0;
 
 	err = hw_get_module(HWC_HARDWARE_MODULE_ID, (const hw_module_t **) &hwcModule);
 	assert(err == 0);
-
+	
 	err = hwc_open_1(hwcModule, &hwcDevicePtr);
 	assert(err == 0);
 
@@ -453,93 +468,45 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
 	list->numHwLayers = 2;
 
 
-	HWComposer *win = new HWComposer(attr_values[0], attr_values[1], HAL_PIXEL_FORMAT_RGBA_8888, hwcDevicePtr, mList, &list->hwLayers[1]);
+	screen_width = attr_values[0];
+	screen_height = attr_values[1];
 
+	win = new HWComposer(attr_values[0], attr_values[1], HAL_PIXEL_FORMAT_RGBA_8888, hwcDevicePtr, mList, &list->hwLayers[1]);
 
-	/*
-	//bcm_host_init();
-
-	// get an EGL display connection
-	display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	display = eglGetDisplay(NULL);
+	assert(eglGetError() == EGL_SUCCESS);
 	assert(display != EGL_NO_DISPLAY);
 
-	// initialize the EGL display connection
-	EGLBoolean result = eglInitialize(display, NULL, NULL);
-	assert(EGL_FALSE != result);
+	rv = eglInitialize(display, 0, 0);
+	assert(eglGetError() == EGL_SUCCESS);
+	assert(rv == EGL_TRUE);
 
-	// get an appropriate EGL frame buffer configuration
-	EGLint num_config;
-	EGLConfig config;
-	static const EGLint attribute_list[] =
-	{
-		EGL_RED_SIZE, 8,
-		EGL_GREEN_SIZE, 8,
-		EGL_BLUE_SIZE, 8,
-		EGL_ALPHA_SIZE, 8,
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_NONE
-	};
-	result = eglChooseConfig(display, attribute_list, &config, 1, &num_config);
-	assert(EGL_FALSE != result);
+	eglChooseConfig((EGLDisplay) display, attr, &ecfg, 1, &num_config);
+	assert(eglGetError() == EGL_SUCCESS);
+	assert(rv == EGL_TRUE);
 
-	result = eglBindAPI(EGL_OPENGL_ES_API);
-	assert(EGL_FALSE != result);
 
-	// create an EGL rendering context
-	static const EGLint context_attributes[] =
-	{
-		EGL_CONTEXT_CLIENT_VERSION, 2,
-		EGL_NONE
-	};
-	context = eglCreateContext(display, config, EGL_NO_CONTEXT, context_attributes);
-	assert(context != EGL_NO_CONTEXT);
-
-	// create an EGL window surface
-	int32_t success = graphics_get_display_size(0, &screen_width, &screen_height);
-	assert(success >= 0);
-
-	VC_RECT_T dst_rect;
-	dst_rect.x = 0;
-	dst_rect.y = 0;
-	dst_rect.width = screen_width;
-	dst_rect.height = screen_height;
-
-	VC_RECT_T src_rect;
-	src_rect.x = 0;
-	src_rect.y = 0;
-	src_rect.width = screen_width << 16;
-	src_rect.height = screen_height << 16;
-
-	DISPMANX_DISPLAY_HANDLE_T dispman_display = vc_dispmanx_display_open(0);
-	DISPMANX_UPDATE_HANDLE_T dispman_update = vc_dispmanx_update_start(0);
-	DISPMANX_ELEMENT_HANDLE_T dispman_element = vc_dispmanx_element_add(dispman_update, dispman_display,
-	 1, &dst_rect, 0, &src_rect, DISPMANX_PROTECTION_NONE, NULL, NULL, DISPMANX_NO_ROTATE);
-
-	nativewindow.element = dispman_element;
-	nativewindow.width = screen_width;
-	nativewindow.height = screen_height;
-	vc_dispmanx_update_submit_sync(dispman_update);
-
-	surface = eglCreateWindowSurface(display, config, &nativewindow, NULL);
-	*/
 
 	surface = eglCreateWindowSurface((EGLDisplay) display, ecfg, (EGLNativeWindowType) static_cast<ANativeWindow *> (win), NULL);
-
+	assert(eglGetError() == EGL_SUCCESS);
 	assert(surface != EGL_NO_SURFACE);
 
-	// connect the context to the surface
-	result = eglMakeCurrent(display, surface, surface, context);
-	assert(EGL_FALSE != result);
+	context = eglCreateContext((EGLDisplay) display, ecfg, EGL_NO_CONTEXT, ctxattr);
+	assert(eglGetError() == EGL_SUCCESS);
+	assert(context != EGL_NO_CONTEXT);
+
+	assert(eglMakeCurrent((EGLDisplay) display, surface, surface, context) == EGL_TRUE);
+
 
 	gles2_create();
 
-	int r=(screen_height*10/frame_height);
-	int h = (frame_height*r)/10;
-	int w = (frame_width*r)/10;
+	int rr=(screen_height*10/frame_height);
+	int h = (frame_height*rr)/10;
+	int w = (frame_width*rr)/10;
 	if (w>screen_width) {
-	    r = (screen_width*10/frame_width);
-	    h = (frame_height*r)/10;
-	    w = (frame_width*r)/10;
+	    rr = (screen_width*10/frame_width);
+	    h = (frame_height*rr)/10;
+	    w = (frame_width*rr)/10;
 	}
 	glViewport((screen_width-w)/2, (screen_height-h)/2, w, h);
 	SetOrtho(proj, -0.5f, +0.5f, +0.5f, -0.5f, -1.0f, 1.0f, 1.0f ,1.0f );
@@ -614,5 +581,5 @@ void video_close()
 void video_draw(uint16_t *pixels)
 {
 	gles2_Draw (pixels);
-	eglSwapBuffers(display, surface);
+	eglSwapBuffers((EGLDisplay) display, surface);
 }
