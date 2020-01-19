@@ -22,7 +22,9 @@
 #include <sys/stat.h>
 #include "gles_video.h"
 #include "rpi.h"
-#include "bcm_host.h"
+//#include "bcm_host.h"
+
+
 
 u32 gamepad_config_map[PLAT_BUTTON_COUNT] =
 {
@@ -57,7 +59,7 @@ void gpsp_plat_init(void)
   //const char *layer_fb_name;
   SDL_Surface* myVideoSurface;
 
-  bcm_host_init();
+  //bcm_host_init();
 
   ret = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_NOPARACHUTE);
   if (ret != 0) {
