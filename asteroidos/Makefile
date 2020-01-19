@@ -45,6 +45,8 @@ LIBS += -lGLESv2 -lEGL
 
 all: $(BIN)
 
+
+
 %.o: %.S
 	$(CXX) $(CFLAGS) -c -o $@ $<
 
