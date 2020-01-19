@@ -8,7 +8,7 @@
 #CC        = gcc
 
 OBJS      = rpi.o main.o cpu.o memory.o video.o input.o sound.o gui.o \
-            cheats.o zip.o  arm_stub.o  warm.o cpu_threaded.o\
+            cheats.o zip.o  arm_stub.o cpu_threaded.o\
 	    gles_video.o video_blend.o
 
 BIN       = gpsp
@@ -16,15 +16,15 @@ BIN       = gpsp
 # Platform specific definitions 
 
 VPATH      += .. ../arm
-CFLAGS     += -DARM_ARCH -DRPI_BUILD -Wall  -fpermissive
-#CFLAGS     += -O3 -mfpu=vfp
+CFLAGS     += -DARM_ARCH -DRPI_BUILD -Wall
+CFLAGS     += -O3 -marm -mcpu=cortex-a7
 CFLAGS     += `pkg-config sdl --cflags`
 CFLAGS+=-Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed
 INCFLAGSCLUDES+=`pkg-config android-headers --cflags`
 CFLAGS+=`pkg-config libhardware --cflags`
 CFLAGS+=`pkg-config hybris-egl-platform --cflags`
 CFLAGS+=`pkg-config hwcomposer-egl --cflags`
-CXXFLAGS += $(CFLAGS)
+CXXFLAGS += $(CFLAGS) -fpermissive
 #CFLAGS     += -I$(SDKSTAGE)/opt/vc/include -I$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads
 #CFLAGS     += -I/opt/vc/include/interface/vmcs_host/linux
 

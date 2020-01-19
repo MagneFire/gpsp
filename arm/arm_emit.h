@@ -43,15 +43,12 @@ u32 execute_spsr_restore(u32 address);
 void execute_swi_arm(u32 pc);
 void execute_swi_thumb(u32 pc);
 
-void function_cc execute_store_u32_safe(u32 address, u32 source);
-
-void step_debug_arm(u32 pc);
-
+void execute_store_u32_safe(u32 address, u32 source);
 
 #define write32(value)                                                        \
   *((u32 *)translation_ptr) = value;                                          \
-  translation_ptr += 4                                                        \
-
+  translation_ptr += 4                                                       \
+  
 #define arm_relative_offset(source, offset)                                   \
   (((((u32)offset - (u32)source) - 8) >> 2) & 0xFFFFFF)                       \
 
@@ -410,6 +407,7 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
   *((u32 *)(dest)) = (*((u32 *)dest) & 0xFF000000) |                          \
    arm_relative_offset(dest, offset)                                          \
 
+
 #define generate_branch_patch_unconditional(dest, offset)                     \
   *((u32 *)(dest)) = (*((u32 *)dest) & 0xFF000000) |                          \
    arm_relative_offset(dest, offset)                                          \
@@ -639,32 +637,7 @@ u32 arm_disect_imm_32bit(u32 imm, u32 *stores, u32 *rotations)
     }                                                                         \
   }                                                                           \
 
-u8 *last_rom_translation_ptr = rom_translation_cache;
-u8 *last_ram_translation_ptr = ram_translation_cache;
-u8 *last_bios_translation_ptr = bios_translation_cache;
-
-#define translate_invalidate_dcache_one(which)                                \
-  if (which##_translation_ptr > last_##which##_translation_ptr)               \
-  {                                                                           \
-    warm_cache_op_range(WOP_D_CLEAN, last_##which##_translation_ptr,          \
-      which##_translation_ptr - last_##which##_translation_ptr);              \
-    warm_cache_op_range(WOP_I_INVALIDATE, last_##which##_translation_ptr, 32);\
-    last_##which##_translation_ptr = which##_translation_ptr;                 \
-  }
-
-#define translate_invalidate_dcache()                                         \
-{                                                                             \
-  translate_invalidate_dcache_one(rom)                                        \
-  translate_invalidate_dcache_one(ram)                                        \
-  translate_invalidate_dcache_one(bios)                                       \
-}
-
-#define invalidate_icache_region(addr, size)                                  \
-  warm_cache_op_range(WOP_I_INVALIDATE, addr, size)
-
-
 #define block_prologue_size 0
-
 
 // It should be okay to still generate result flags, spsr will overwrite them.
 // This is pretty infrequent (returning from interrupt handlers, et al) so
@@ -699,7 +672,7 @@ u8 *last_bios_translation_ptr = bios_translation_cache;
   }                                                                           \
 
 
-u32 function_cc execute_spsr_restore_body(u32 pc)
+u32 execute_spsr_restore_body(u32 pc)
 {
   set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);
   check_for_interrupts();
@@ -1097,7 +1070,7 @@ u32 function_cc execute_spsr_restore_body(u32 pc)
 
 #define arm_generate_op_reg(name, load_op, store_op, flags_op)                \
   u32 shift_type = (opcode >> 5) & 0x03;                                      \
-  arm_decode_data_proc_reg();                                                 \
+  arm_decode_data_proc_reg(opcode);                                           \
   prepare_load_rn_##load_op();                                                \
   prepare_store_rd_##store_op();                                              \
                                                                               \
@@ -1122,7 +1095,7 @@ u32 function_cc execute_spsr_restore_body(u32 pc)
 // imm will be loaded by the called function if necessary.
 
 #define arm_generate_op_imm(name, load_op, store_op, flags_op)                \
-  arm_decode_data_proc_imm();                                                 \
+  arm_decode_data_proc_imm(opcode);                                           \
   prepare_load_rn_##load_op();                                                \
   prepare_store_rd_##store_op();                                              \
   generate_op_##name##_imm(_rd, _rn);                                         \
@@ -1274,7 +1247,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_psr(op_type, transfer_type, psr_reg)                              \
 {                                                                             \
-  arm_decode_psr_##op_type();                                                 \
+  arm_decode_psr_##op_type(opcode);                                           \
   arm_psr_##transfer_type(op_type, psr_reg);                                  \
 }                                                                             \
 
@@ -1835,7 +1808,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_branch(arm)                                                        \
 
 #define arm_bx()                                                              \
-  arm_decode_branchx();                                                       \
+  arm_decode_branchx(opcode);                                                 \
   generate_load_reg(reg_a0, rn);                                              \
   generate_indirect_branch_dual();                                            \
 
@@ -1958,9 +1931,4 @@ void execute_swi_hle_div_c()
   generate_update_pc(pc);                                                     \
   generate_indirect_branch_no_cycle_update(type)                              \
 
-#define generate_step_debug()                                                 \
-  generate_function_call(step_debug_arm);                                     \
-  write32(pc)                                                                 \
-
 #endif
-

@@ -55,7 +55,7 @@ static uint16_t * video_buff;
 
 void gpsp_plat_init(void)
 {
-  int ret, w, h, fd;
+  /*int ret, w, h, fd;
   //const char *layer_fb_name;
   SDL_Surface* myVideoSurface;
 
@@ -73,7 +73,7 @@ void gpsp_plat_init(void)
 	fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
 	exit(1);
     }
-  SDL_ShowCursor(0);
+  SDL_ShowCursor(0);*/
   fb_set_mode(240, 160, 0, 0, 0, 0);
   screen_scale = 3;
 }

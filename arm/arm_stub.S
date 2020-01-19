@@ -1,51 +1,11 @@
 .align 2
 
-.global arm_update_gba_arm
-.global arm_update_gba_thumb
-.global arm_update_gba_idle_arm
-.global arm_update_gba_idle_thumb
+.globl invalidate_icache_region
+.globl invalidate_cache_region
 
-.global arm_indirect_branch_arm
-.global arm_indirect_branch_thumb
-.global arm_indirect_branch_dual_arm
-.global arm_indirect_branch_dual_thumb
-
-.global execute_arm_translate
-
-.global execute_store_u8
-.global execute_store_u16
-.global execute_store_u32
-.global execute_store_u32_safe
-
-.global execute_load_u8
-.global execute_load_s8
-.global execute_load_u16
-.global execute_load_s16
-.global execute_load_u32
-
-.global execute_store_cpsr
-.global execute_read_spsr
-.global execute_store_spsr
-.global execute_spsr_restore
-
-.global execute_swi_arm
-.global execute_swi_thumb
-
-.global execute_patch_bios_read
-.global execute_patch_bios_protect
-
-.global execute_bios_ptr_protected
-.global execute_bios_rom_ptr
-
-
-.global step_debug_arm
-
-.global invalidate_icache_region
-.global invalidate_cache_region
-
-.global memory_map_read
-.global memory_map_write
-.global reg
+.globl memory_map_read
+.globl memory_map_write
+.globl reg
 
 #define REG_BASE_OFFSET   1024
 
@@ -216,7 +176,11 @@
 
 #define arm_update_gba_builder(name, mode, return_op)                        ;\
                                                                              ;\
+.align 2                                                                     ;\
+.globl arm_update_gba_##name                                                 ;\
+.globl _arm_update_gba_##name                                                ;\
 arm_update_gba_##name:                                                       ;\
+_arm_update_gba_##name:                                                      ;\
   load_pc_##return_op()                                                      ;\
   str r0, [reg_base, #REG_PC]             /* write out the PC              */;\
                                                                              ;\
@@ -268,19 +232,31 @@ arm_update_gba_builder(idle_thumb, thumb, add)
 @ Input:
 @ r0: PC to branch to
 
+.align 2
+.globl arm_indirect_branch_arm
+.globl _arm_indirect_branch_arm
 arm_indirect_branch_arm:
+_arm_indirect_branch_arm:
   save_flags()
   call_c_function(block_lookup_address_arm)
   restore_flags()
   bx r0
 
+.align 2
+.globl arm_indirect_branch_thumb
+.globl _arm_indirect_branch_thumb
 arm_indirect_branch_thumb:
+_arm_indirect_branch_thumb:
   save_flags()
   call_c_function(block_lookup_address_thumb)
   restore_flags()
   bx r0
 
+.align 2
+.globl arm_indirect_branch_dual_arm
+.globl _arm_indirect_branch_dual_arm
 arm_indirect_branch_dual_arm:
+_arm_indirect_branch_dual_arm:
   save_flags()
   tst r0, #0x01                           @ check lower bit
   bne 1f                                  @ if set going to Thumb mode
@@ -299,7 +275,11 @@ arm_indirect_branch_dual_arm:
   restore_flags()
   bx r0                                   @ return
 
+.align 2
+.globl arm_indirect_branch_dual_thumb
+.globl _arm_indirect_branch_dual_thumb
 arm_indirect_branch_dual_thumb:
+_arm_indirect_branch_dual_thumb:
   save_flags()
   tst r0, #0x01                           @ check lower bit
   beq 1f                                  @ if set going to ARM mode
@@ -326,7 +306,11 @@ arm_indirect_branch_dual_thumb:
 @ r1: bitmask of which bits in cpsr to update
 @ r2: current PC
 
+.align 2
+.globl execute_store_cpsr
+.globl _execute_store_cpsr
 execute_store_cpsr:
+_execute_store_cpsr:
   save_flags()
   and reg_flags, r0, r1                   @ reg_flags = new_cpsr & store_mask
   ldr r0, [reg_base, #REG_CPSR]           @ r0 = cpsr
@@ -359,7 +343,11 @@ execute_store_cpsr:
 @ r0: new cpsr value
 @ r1: bitmask of which bits in spsr to update
 
+.align 2
+.globl execute_store_spsr
+.globl _execute_store_spsr
 execute_store_spsr:
+_execute_store_spsr:
   ldr r1, =spsr                           @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = CPU_MODE
   str r0, [r1, r2, lsl #2]                @ spsr[CPU_MODE] = new_spsr
@@ -370,7 +358,11 @@ execute_store_spsr:
 @ Output:
 @ r0: spsr
 
+.align 2
+.globl execute_read_spsr
+.globl _execute_read_spsr
 execute_read_spsr:
+_execute_read_spsr:
   ldr r0, =spsr                           @ r0 = spsr
   ldr r1, [reg_base, #CPU_MODE]           @ r1 = CPU_MODE
   ldr r0, [r0, r1, lsl #2]                @ r0 = spsr[CPU_MODE]
@@ -382,7 +374,11 @@ execute_read_spsr:
 @ Input:
 @ r0: current pc
 
+.align 2
+.globl execute_spsr_restore
+.globl _execute_spsr_restore
 execute_spsr_restore:
+_execute_spsr_restore:
   save_flags()
   ldr r1, =spsr                           @ r1 = spsr
   ldr r2, [reg_base, #CPU_MODE]           @ r2 = cpu_mode
@@ -418,7 +414,11 @@ execute_spsr_restore:
 
 #define execute_swi_builder(mode)                                            ;\
                                                                              ;\
+.align 2                                                                     ;\
+.globl execute_swi_##mode                                                    ;\
+.globl _execute_swi_##mode                                                   ;\
 execute_swi_##mode:                                                          ;\
+_execute_swi_##mode:                                                          ;\
   save_flags()                                                               ;\
   ldr r1, =reg_mode                       /* r1 = reg_mode                 */;\
   /* reg_mode[MODE_SUPERVISOR][6] = pc                                     */;\
@@ -451,8 +451,11 @@ execute_swi_builder(thumb)
 
 #define execute_swi_function_builder(swi_function, mode)                     ;\
                                                                              ;\
-  .global execute_swi_hle_##swi_function##_##mode                            ;\
+.align 2                                                                     ;\
+.globl execute_swi_hle_##swi_function##_##mode                               ;\
+.globl _execute_swi_hle_##swi_function##_##mode                              ;\
 execute_swi_hle_##swi_function##_##mode:                                     ;\
+_execute_swi_hle_##swi_function##_##mode:                                    ;\
   save_flags()                                                               ;\
   store_registers_##mode()                                                   ;\
   call_c_function(execute_swi_hle_##swi_function##_c)                        ;\
@@ -473,7 +476,11 @@ execute_swi_function_builder(div, thumb)
 
 @ Uses sp as reg_base; must hold consistently true.
 
+.align 2
+.globl execute_arm_translate
+.globl _execute_arm_translate
 execute_arm_translate:
+_execute_arm_translate:
   sub sp, sp, #0x100                      @ allocate room for register data
 
   mvn reg_cycles, r0                      @ load cycle counter
@@ -540,7 +547,11 @@ execute_arm_translate:
 
 #define execute_store_builder(store_type, store_op, load_op)                 ;\
                                                                              ;\
+.align 2                                                                     ;\
+.globl execute_store_u##store_type                                           ;\
+.globl _execute_store_u##store_type                                          ;\
 execute_store_u##store_type:                                                 ;\
+_execute_store_u##store_type:                                                ;\
   execute_store_body(store_type, store_op)                                   ;\
   sub r2, r2, #0x8000                     /* Pointer to code status data   */;\
   load_op r0, [r2, r0]                    /* check code flag               */;\
@@ -570,7 +581,10 @@ execute_store_builder(16, strh, ldrh)
 execute_store_builder(32, str, ldr)
 
 
+.globl execute_store_u32_safe
+.globl _execute_store_u32_safe
 execute_store_u32_safe:
+_execute_store_u32_safe:
   execute_store_body(32_safe, str)
   restore_flags()
   ldmia sp!, { pc }                       @ return
@@ -682,7 +696,11 @@ lookup_pc_arm:
 
 #define execute_load_builder(load_type, load_function, load_op, mask)        ;\
                                                                              ;\
+.align 2                                                                     ;\
+.globl execute_load_##load_type                                              ;\
+.globl _execute_load_##load_type                                             ;\
 execute_load_##load_type:                                                    ;\
+_execute_load_##load_type:                                                   ;\
   save_flags()                                                               ;\
   tst r0, mask                            /* make sure address is in range */;\
   bne ext_load_##load_type                /* if not do ext load            */;\
@@ -723,7 +741,11 @@ execute_##region##_ptr:                                                      ;\
   bx lr                                   /* return                        */;\
 
 
+.align 2
+.globl execute_bios_ptr_protected
+.globl _execute_bios_ptr_protected
 execute_bios_ptr_protected:
+_execute_bios_ptr_protected:
   ldr r1, =bios_read_protect              @ load bios read ptr
   and r0, r0, #0x03                       @ only want bottom 2 bits
   bx lr                                   @ return
@@ -743,7 +765,7 @@ execute_ewram_ptr:
 @  u32 gamepak_index = address >> 15;
 @  u8 *map = memory_map_read[gamepak_index];
 
-@  if(map == NULL)
+@  if(!map)
 @    map = load_gamepak_page(gamepak_index & 0x3FF);
 
 @  value = address##type(map, address & 0x7FFF)
@@ -892,7 +914,11 @@ load_ptr_read_function_table:
 
 @ Patch the read function table to allow for BIOS reads.
 
+.align 2
+.globl execute_patch_bios_read
+.globl _execute_patch_bios_read
 execute_patch_bios_read:
+_execute_patch_bios_read:
   ldr r1, =reg                            @ r1 = reg
   ldr r0, =execute_bios_rom_ptr           @ r0 = patch function
   ldr r1, [r1]
@@ -902,7 +928,11 @@ execute_patch_bios_read:
 
 @ Patch the read function table to allow for BIOS reads.
 
+.align 2
+.globl execute_patch_bios_protect
+.globl _execute_patch_bios_protect
 execute_patch_bios_protect:
+_execute_patch_bios_protect:
   ldr r1, =reg                            @ r1 = reg
   ldr r0, =execute_bios_ptr_protected     @ r0 = patch function
   ldr r1, [r1]
@@ -933,35 +963,6 @@ execute_patch_bios_protect:
   type##_reg_scratch(9)                                                       ;\
   type##_reg_scratch(12)                                                      ;\
   type##_reg_scratch(14)                                                      ;\
-
-
-step_debug_arm:
-  save_flags()
-  collapse_flags(r0)
-
-  ldr r0, [reg_base, #REG_CPSR]           @ r1 = cpsr
-  tst r0, #0x20                           @ see if Thumb bit is set
-
-  ldr r0, [lr]                            @ load PC
-  mvn r1, reg_cycles                      @ load cycle counter
-
-  beq 1f                                  @ if not goto ARM mode
-
-  scratch_regs_thumb(save)
-
-  store_registers_thumb()                 @ write back Thumb regs
-  call_c_function(step_debug)             @ call debug step
-  scratch_regs_thumb(restore)
-  restore_flags()
-  add pc, lr, #4                          @ return
-
-1:
-  scratch_regs_arm(save)
-  store_registers_arm()                   @ write back ARM regs
-  call_c_function(step_debug)             @ call debug step
-  scratch_regs_arm(restore)
-  restore_flags()
-  add pc, lr, #4                          @ return, skipping PC
 
 .pool
 

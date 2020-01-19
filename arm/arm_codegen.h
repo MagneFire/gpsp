@@ -59,48 +59,6 @@ void write_to_file(u32 val);
 //write32(i);
 /*{ *(u32*)translation_ptr = (i); translation_ptr += 4; } */
 
-#if defined(GIZMONDO) || defined(POCKETPC) /* Implemented but not working right yet for PPC */
-
-// --------------------------------------------------------------------------
-// These declarations for coredll are extracted from platform builder
-// source code
-// --------------------------------------------------------------------------
-
-/* Flags for CacheSync/CacheRangeFlush */
-#define CACHE_SYNC_DISCARD      0x001   /* write back & discard all cached data */
-#define CACHE_SYNC_INSTRUCTIONS 0x002   /* discard all cached instructions */
-#define CACHE_SYNC_WRITEBACK    0x004   /* write back but don't discard data cache*/
-#define CACHE_SYNC_FLUSH_I_TLB  0x008   /* flush I-TLB */
-#define CACHE_SYNC_FLUSH_D_TLB  0x010   /* flush D-TLB */
-#define CACHE_SYNC_FLUSH_TLB    (CACHE_SYNC_FLUSH_I_TLB|CACHE_SYNC_FLUSH_D_TLB)    /* flush all TLB */
-#define CACHE_SYNC_L2_WRITEBACK 0x020   /* write-back L2 Cache */
-#define CACHE_SYNC_L2_DISCARD   0x040   /* discard L2 Cache */
-
-#define CACHE_SYNC_ALL          0x07F   /* sync and discard everything in Cache/TLB */
-
-extern "C" {
-  void CacheSync(int flags);
-}
-#define CLEAR_INSN_CACHE(BEG, END) CacheSync(CACHE_SYNC_INSTRUCTIONS | CACHE_SYNC_WRITEBACK);
-
-#else
-
-#if 0
-#define CLEAR_INSN_CACHE(BEG, END)                  \
-{                                 \
-  register unsigned long _beg __asm ("a1") = (unsigned long) (BEG); \
-  register unsigned long _end __asm ("a2") = (unsigned long) (END); \
-  register unsigned long _flg __asm ("a3") = 0;           \
-  register unsigned long _scno __asm ("r7") = 0xf0002;        \
-  __asm __volatile ("swi 0x9f0002   @ sys_cacheflush"     \
-        : "=r" (_beg)                     \
-        : "0" (_beg), "r" (_end), "r" (_flg), "r" (_scno));   \
-}
-
-#endif
-
-#endif
-
 #if defined(_MSC_VER) && !defined(ARM_NOIASM)
 # define ARM_IASM(_expr) __easfdmit (_expr)
 #else
@@ -381,11 +339,18 @@ typedef struct {
 
 
 /* op2 is reg shift by imm */
-typedef union {
+typedef union
+{
   ARMDPI_op2_reg_shift r2;
-  struct {
+  struct
+  {
+#ifdef MSB_FIRST
+    arminstr_t shift : 5;
+    arminstr_t _dummy_r2 : 7;
+#else
     arminstr_t _dummy_r2 : 7;
     arminstr_t shift : 5;
+#endif
   } imm;
 } ARMDPI_op2_reg_imm;
 
@@ -393,9 +358,15 @@ typedef union {
 typedef union {
   ARMDPI_op2_reg_shift r2;
   struct {
+#ifdef MSB_FIRST
+    arminstr_t rs        : 4;
+    arminstr_t pad       : 1; /* always 0, to differentiate from HXFER etc. */
+    arminstr_t _dummy_r2 : 7;
+#else
     arminstr_t _dummy_r2 : 7;
     arminstr_t pad       : 1; /* always 0, to differentiate from HXFER etc. */
     arminstr_t rs        : 4;
+#endif
   } reg;
 } ARMDPI_op2_reg_reg;
 
@@ -408,6 +379,16 @@ typedef union {
   ARMDPI_op2_reg_reg op2_reg_reg;
 
   struct {
+#ifdef MSB_FIRST
+    arminstr_t cond   :  4;
+    arminstr_t tag    :  2; /* 0 0 */
+    arminstr_t type   :  1; /* type of op2, 0 = register, 1 = immediate */
+    arminstr_t opcode :  4; /* arithmetic/logic operation */
+    arminstr_t s      :  1; /* S-bit controls PSR update */
+    arminstr_t rn     :  4; /* first operand reg */
+    arminstr_t rd     :  4; /* destination reg */
+    arminstr_t op2    : 12; /* raw operand 2 */
+#else
     arminstr_t op2    : 12; /* raw operand 2 */
     arminstr_t rd     :  4; /* destination reg */
     arminstr_t rn     :  4; /* first operand reg */
@@ -416,6 +397,7 @@ typedef union {
     arminstr_t type   :  1; /* type of op2, 0 = register, 1 = immediate */
     arminstr_t tag    :  2; /* 0 0 */
     arminstr_t cond   :  4;
+#endif
   } all;
 } ARMInstrDPI;
 
@@ -713,7 +695,21 @@ typedef struct {
 /*  Word/byte transfer */
 typedef union {
   ARMDPI_op2_reg_imm op2_reg_imm;
-  struct {
+  struct
+  {
+#ifdef MSB_FIRST
+    arminstr_t cond    :  4;
+    arminstr_t tag     :  2; /* 0 1 */
+    arminstr_t type    :  1; /* imm(0) / register(1) */
+    arminstr_t p       :  1; /* post-index(0) / pre-index(1) */
+    arminstr_t u       :  1; /* down(0) / up(1) */
+    arminstr_t b       :  1;
+    arminstr_t wb      :  1;
+    arminstr_t ls      :  1;
+    arminstr_t rn      :  4;
+    arminstr_t rd      :  4;
+    arminstr_t op2_imm : 12;
+#else
     arminstr_t op2_imm : 12;
     arminstr_t rd      :  4;
     arminstr_t rn      :  4;
@@ -725,6 +721,7 @@ typedef union {
     arminstr_t type    :  1; /* imm(0) / register(1) */
     arminstr_t tag     :  2; /* 0 1 */
     arminstr_t cond    :  4;
+#endif
   } all;
 } ARMInstrWXfer;
 
@@ -1112,7 +1109,20 @@ typedef struct {
 /* Move register to PSR. */
 typedef union {
   ARMDPI_op2_imm op2_imm;
-  struct {
+  struct
+  {
+#ifdef MSB_FIRST
+    arminstr_t cond : 4;
+    arminstr_t tag  : 2; /* 0 */
+    arminstr_t type : 1;
+    arminstr_t tag2 : 2; /* 0x2 */
+    arminstr_t sel  : 1;
+    arminstr_t tag3 : 2; /* 0x2 */
+    arminstr_t fld  : 4;
+    arminstr_t tag4 : 4; /* 0xF */
+    arminstr_t pad  : 8; /* 0 */
+    arminstr_t rm   : 4;
+#else
     arminstr_t rm   : 4;
     arminstr_t pad  : 8; /* 0 */
     arminstr_t tag4 : 4; /* 0xF */
@@ -1123,6 +1133,7 @@ typedef union {
     arminstr_t type : 1;
     arminstr_t tag  : 2; /* 0 */
     arminstr_t cond : 4;
+#endif
   } all;
 } ARMInstrMSR;
 
