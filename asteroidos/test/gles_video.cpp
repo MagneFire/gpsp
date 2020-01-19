@@ -38,6 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <malloc.h>
 #include <sync/sync.h>
 
+#include "gles_video.h"
+
+
 static uint32_t frame_width = 0;
 static uint32_t frame_height = 0;
 

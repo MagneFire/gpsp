@@ -3,11 +3,11 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include "gles_video.h"
+
 #define RGB15(r, g, b)  (((r) << (5+6)) | ((g) << 6) | (b))
 
-void video_init(uint32_t width,uint32_t height, uint32_t f);
-void video_close();
-void video_draw(uint16_t *pixels);
+
 
 
 

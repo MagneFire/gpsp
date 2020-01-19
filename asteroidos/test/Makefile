@@ -9,7 +9,8 @@ BIN       = glestest
 
 # Platform specific definitions 
 
-CFLAGS+=-D_LINUX -fpermissive
+CFLAGS+=-D_LINUX
+CXXFLAGS+=$(CFLAGS) -fpermissive
 
 #LIBS +=-L$(SDKSTAGE)/opt/vc/lib/ -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt 
 LIBS +=-lpthread
@@ -36,10 +37,10 @@ INCLUDES+=`pkg-config hwcomposer-egl --cflags`
 all:	$(BIN)
 
 %.o: %.c
-	$(CXX) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 %.o: %.cpp
-	$(CXX) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(BIN): $(OBJS)
 	$(CXX) $(OBJS) $(LIBS) -o $(BIN)
