@@ -55,6 +55,12 @@ static uint16_t * video_buff;
 
 void gpsp_plat_init(void)
 {
+  int ret;
+  ret = SDL_Init(SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_NOPARACHUTE);
+  if (ret != 0) {
+    fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    exit(1);
+  }
   /*int ret, w, h, fd;
   //const char *layer_fb_name;
   SDL_Surface* myVideoSurface;

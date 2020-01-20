@@ -921,4 +921,3 @@ void input_##type##_savestate(file_tag_type savestate_file)                   \
 
 input_savestate_builder(read);
 input_savestate_builder(write_mem);
-

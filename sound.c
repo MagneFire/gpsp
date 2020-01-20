@@ -25,19 +25,13 @@ u32 global_enable_audio = 1;
 direct_sound_struct direct_sound_channel[2];
 gbc_sound_struct gbc_sound_channel[4];
 
-#ifdef RPI_BUILD
-u32 sound_frequency = 22050;
-#else
 u32 sound_frequency = 44100;
-#endif
 
 SDL_mutex *sound_mutex;
 static SDL_cond *sound_cv;
 
 #ifdef PSP_BUILD
 u32 audio_buffer_size_number = 1;
-#elif defined(POLLUX_BUILD)
-u32 audio_buffer_size_number = 7;
 #else
 u32 audio_buffer_size_number = 8;
 #endif
@@ -429,6 +423,7 @@ u32 gbc_sound_master_volume;
 
 void update_gbc_sound(u32 cpu_ticks)
 {
+  return;
   fixed16_16 buffer_ticks = float_to_fp16_16((float)(cpu_ticks -
    gbc_sound_last_cpu_ticks) * sound_frequency / GBC_BASE_RATE);
   u32 i, i2;
@@ -451,47 +446,6 @@ void update_gbc_sound(u32 cpu_ticks)
   {
     buffer_ticks += 1;
     gbc_sound_partial_ticks &= 0xFFFF;
-  }
-
-  SDL_LockMutex(sound_mutex);
-  if(synchronize_flag)
-  {
-    if(((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) >=
-     (audio_buffer_size * 2))
-    {
-      while(((gbc_sound_buffer_index - sound_buffer_base) % BUFFER_SIZE) >
-       (audio_buffer_size * 3 / 2))
-      {
-        SDL_CondWait(sound_cv, sound_mutex);
-      }
-
-#ifdef PSP_BUILD
-      if(current_frameskip_type == auto_frameskip)
-      {
-        sceDisplayWaitVblankStart();
-        real_frame_count = 0;
-        virtual_frame_count = 0;
-      }
-#else
-      if(current_frameskip_type == auto_frameskip)
-      {
-/*
-        u64 current_ticks;
-        u64 next_ticks;
-        get_ticks_us(&current_ticks);
-
-        next_ticks = ((current_ticks + 16666) / 16667) * 16667;
-        delay_us(next_ticks - current_ticks);
-
-        get_ticks_us(&frame_count_initial_timestamp);
-*/
-        /* prevent frameskip, or it will cause more audio,
-	 * then more waiting here, then frame skip again, ... */
-        num_skipped_frames = 100;
-      }
-#endif
-
-    }
   }
   if(sound_on == 1)
   {
@@ -568,9 +522,6 @@ void update_gbc_sound(u32 cpu_ticks)
   gbc_sound_buffer_index =
    (gbc_sound_buffer_index + (buffer_ticks * 2)) % BUFFER_SIZE;
 
-  SDL_UnlockMutex(sound_mutex);
-
-  SDL_CondSignal(sound_cv);
 }
 
 #define sound_copy_normal()                                                   \
@@ -600,8 +551,7 @@ void update_gbc_sound(u32 cpu_ticks)
     source[i] = 0;                                                            \
   }                                                                           \
 
-
-void sound_callback(void *userdata, Uint8 *stream, int length)
+void sound_callback(void *userdata, u8 *stream, int length)
 {
   u32 sample_length = length / 2;
   u32 _length;

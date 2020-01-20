@@ -233,7 +233,7 @@ typedef u32 fixed8_24;
 #include "cheats.h"
 
 #ifdef ARM_ARCH
-  //#include "arm/warm.h"
+  #include "arm/warm.h"
 #endif
 
 #ifdef PSP_BUILD

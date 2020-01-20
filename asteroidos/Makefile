@@ -8,7 +8,7 @@
 #CC        = gcc
 
 OBJS      = rpi.o main.o cpu.o memory.o video.o input.o sound.o gui.o \
-            cheats.o zip.o  arm_stub.o cpu_threaded.o\
+            cheats.o zip.o  arm_stub.o warm.o cpu_threaded.o\
 	    gles_video.o video_blend.o
 
 BIN       = gpsp

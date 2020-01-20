@@ -22,75 +22,28 @@
 // - block memory needs psr swapping and user mode reg swapping
 
 #include "common.h"
-#if defined(VITA)
-#include <psp2/kernel/sysmem.h>
-#include <stdio.h>
-#endif
 
-u32 idle_loop_target_pc = 0xFFFFFFFF;
-u32 iwram_stack_optimize = 1;
-u32 translation_gate_target_pc[MAX_TRANSLATION_GATES];
-u32 translation_gate_targets = 0;
-
-u8 *last_rom_translation_ptr = NULL;
-u8 *last_ram_translation_ptr = NULL;
-u8 *last_bios_translation_ptr = NULL;
-
-#if defined(HAVE_MMAP)
-u8* rom_translation_cache;
-u8* ram_translation_cache;
-u8* bios_translation_cache;
-u8 *rom_translation_ptr;
-u8 *ram_translation_ptr;
-u8 *bios_translation_ptr;
-#elif defined(VITA)
-u8* rom_translation_cache;
-u8* ram_translation_cache;
-u8* bios_translation_cache;
-u8 *rom_translation_ptr;
-u8 *ram_translation_ptr;
-u8 *bios_translation_ptr;
-int sceBlock;
-#elif defined(_3DS) 
-u8* rom_translation_cache_ptr;
-u8* ram_translation_cache_ptr;
-u8* bios_translation_cache_ptr;
-u8 *rom_translation_ptr = rom_translation_cache;
-u8 *ram_translation_ptr = ram_translation_cache;
-u8 *bios_translation_ptr = bios_translation_cache;
-#elif defined(ARM_MEMORY_DYNAREC)
-__asm__(".section .jit,\"awx\",%progbits");
-
-u8 rom_translation_cache[ROM_TRANSLATION_CACHE_SIZE]
-		__attribute__ ((aligned(4),section(".jit")));
-u8 *rom_translation_ptr = rom_translation_cache;
-
-u8 ram_translation_cache[RAM_TRANSLATION_CACHE_SIZE]
-		__attribute__ ((aligned(4),section(".jit")));
-u8 *ram_translation_ptr = ram_translation_cache;
-
-u8 bios_translation_cache[BIOS_TRANSLATION_CACHE_SIZE]
-		__attribute__ ((aligned(4),section(".jit")));
-u8 *bios_translation_ptr = bios_translation_cache;
-#else
 u8 rom_translation_cache[ROM_TRANSLATION_CACHE_SIZE];
-u8 ram_translation_cache[RAM_TRANSLATION_CACHE_SIZE];
-u8 bios_translation_cache[BIOS_TRANSLATION_CACHE_SIZE];
 u8 *rom_translation_ptr = rom_translation_cache;
-u8 *ram_translation_ptr = ram_translation_cache;
-u8 *bios_translation_ptr = bios_translation_cache;
-#endif
 
+u8 ram_translation_cache[RAM_TRANSLATION_CACHE_SIZE];
+u8 *ram_translation_ptr = ram_translation_cache;
 u32 iwram_code_min = 0xFFFFFFFF;
 u32 iwram_code_max = 0xFFFFFFFF;
 u32 ewram_code_min = 0xFFFFFFFF;
 u32 ewram_code_max = 0xFFFFFFFF;
 
+u8 bios_translation_cache[BIOS_TRANSLATION_CACHE_SIZE];
+u8 *bios_translation_ptr = bios_translation_cache;
 
 u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 
 // Default
+u32 idle_loop_target_pc = 0xFFFFFFFF;
 u32 force_pc_update_target = 0xFFFFFFFF;
+u32 translation_gate_target_pc[MAX_TRANSLATION_GATES];
+u32 translation_gate_targets = 0;
+u32 iwram_stack_optimize = 1;
 u32 allow_smc_ram_u8 = 1;
 u32 allow_smc_ram_u16 = 1;
 u32 allow_smc_ram_u32 = 1;
@@ -111,29 +64,29 @@ typedef struct
 
 extern u8 bit_count[256];
 
-#define arm_decode_data_proc_reg(opcode)                                      \
+#define arm_decode_data_proc_reg()                                            \
   u32 rn = (opcode >> 16) & 0x0F;                                             \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 rm = opcode & 0x0F                                                      \
 
-#define arm_decode_data_proc_imm(opcode)                                      \
+#define arm_decode_data_proc_imm()                                            \
   u32 rn = (opcode >> 16) & 0x0F;                                             \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 imm = opcode & 0xFF;                                                    \
   u32 imm_ror = ((opcode >> 8) & 0x0F) * 2                                    \
 
-#define arm_decode_psr_reg(opcode)                                            \
+#define arm_decode_psr_reg()                                                  \
   u32 psr_field = (opcode >> 16) & 0x0F;                                      \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 rm = opcode & 0x0F                                                      \
 
-#define arm_decode_psr_imm(opcode)                                            \
+#define arm_decode_psr_imm()                                                  \
   u32 psr_field = (opcode >> 16) & 0x0F;                                      \
   u32 rd = (opcode >> 12) & 0x0F;                                             \
   u32 imm = opcode & 0xFF;                                                    \
   u32 imm_ror = ((opcode >> 8) & 0x0F) * 2                                    \
 
-#define arm_decode_branchx(opcode)                                            \
+#define arm_decode_branchx()                                                  \
   u32 rn = opcode & 0x0F                                                      \
 
 #define arm_decode_multiply()                                                 \
@@ -232,7 +185,7 @@ extern u8 bit_count[256];
   u32 offset = opcode & 0x07FF                                                \
 
 
-#ifdef PSP
+#ifdef PSP_BUILD
 
 #include "psp/mips_emit.h"
 
@@ -246,76 +199,6 @@ extern u8 bit_count[256];
 
 #endif
 
-/* Cache invalidation */
-
-#if defined(PSP)
-#define translate_invalidate_dcache() sceKernelDcacheWritebackAll()
-#define invalidate_icache_region(addr, size) (void)0
-
-#elif defined(VITA)
-#define translate_invalidate_dcache_one(which)                                \
-  if (which##_translation_ptr > last_##which##_translation_ptr)               \
-  {   	                                             \
-    sceKernelSyncVMDomain(sceBlock,last_##which##_translation_ptr,          \
-      which##_translation_ptr - last_##which##_translation_ptr);              \
-    last_##which##_translation_ptr = which##_translation_ptr;                 \
-  }
-
-#define translate_invalidate_dcache()                                         \
-{                                                                             \
-  translate_invalidate_dcache_one(rom)                                        \
-  translate_invalidate_dcache_one(ram)                                        \
-  translate_invalidate_dcache_one(bios)                                       \
-}
-
-#define invalidate_icache_region(addr, size) (void)0
-
-#elif defined(_3DS)
-#include "3ds/3ds_utils.h"
-
-#define translate_invalidate_dcache() ctr_flush_invalidate_cache()
-#define invalidate_icache_region(addr, size) (void)0
-
-#elif defined(ARM_ARCH)
-static int sys_cacheflush(void *addr, unsigned long size)
-{
-   void *start = (void*)addr;
-   void *end   = (void*)(char *)addr + size;
-
-	register const unsigned char *r0 asm("r0") = start;
-	register const unsigned char *r1 asm("r1") = end;
-	register const int r2 asm("r2") = 0;
-	register const int r7 asm("r7") = 0xf0002;
-	asm volatile ("svc 0x0" :: "r" (r0), "r" (r1), "r" (r2), "r" (r7));
-   return -1;
-}
-
-#define translate_invalidate_dcache_one(which)                                \
-  if (which##_translation_ptr > last_##which##_translation_ptr)               \
-  {                                                                           \
-    sys_cacheflush(last_##which##_translation_ptr,          \
-      which##_translation_ptr - last_##which##_translation_ptr);              \
-    sys_cacheflush(last_##which##_translation_ptr, 32);\
-    last_##which##_translation_ptr = which##_translation_ptr;                 \
-  }
-
-#define translate_invalidate_dcache()                                         \
-{                                                                             \
-  translate_invalidate_dcache_one(rom)                                        \
-  translate_invalidate_dcache_one(ram)                                        \
-  translate_invalidate_dcache_one(bios)                                       \
-}
-#define invalidate_icache_region(addr, size) (void)0
-
-#else
-
-#define translate_invalidate_dcache() (void)0
-#define invalidate_icache_region(addr, size) (void)0
-
-#endif
-
-/* End of Cache invalidation */
-
 
 #define check_pc_region(pc)                                                   \
   new_pc_region = (pc >> 15);                                                 \
@@ -324,7 +207,7 @@ static int sys_cacheflush(void *addr, unsigned long size)
     pc_region = new_pc_region;                                                \
     pc_address_block = memory_map_read[new_pc_region];                        \
                                                                               \
-    if(!pc_address_block)                                                     \
+    if(pc_address_block == NULL)                                              \
       pc_address_block = load_gamepak_page(pc_region & 0x3FF);                \
   }                                                                           \
 
@@ -1754,6 +1637,10 @@ static int sys_cacheflush(void *addr, unsigned long size)
       break;                                                                  \
     }                                                                         \
                                                                               \
+    case 0xC0 ... 0xEF:                                                       \
+      /* coprocessor instructions, reserved on GBA */                         \
+      break;                                                                  \
+                                                                              \
     case 0xF0 ... 0xFF:                                                       \
     {                                                                         \
       /* SWI comment */                                                       \
@@ -2848,17 +2735,15 @@ u32 translation_flush_count = 0;
 
 
 #define block_lookup_address_builder(type)                                    \
-u8 *block_lookup_address_##type(u32 pc)                           	      \
+u8 function_cc *block_lookup_address_##type(u32 pc)                           \
 {                                                                             \
   u16 *location;                                                              \
   u32 block_tag;                                                              \
   u8 *block_address;                                                          \
                                                                               \
   /* Starting at the beginning, we allow for one translation cache flush. */  \
-  if(translation_recursion_level == 0){                                       \
+  if(translation_recursion_level == 0)                                        \
     translation_flush_count = 0;                                              \
-		                                                              \
-	}																																						\
   block_lookup_address_pc_##type();                                           \
                                                                               \
   switch(pc >> 24)                                                            \
@@ -2891,6 +2776,7 @@ u8 *block_lookup_address_##type(u32 pc)                           	      \
        (ROM_BRANCH_HASH_SIZE - 1);                                            \
       u32 *block_ptr = rom_branch_hash[hash_target];                          \
       u32 **block_ptr_address = rom_branch_hash + hash_target;                \
+                                                                              \
       while(block_ptr)                                                        \
       {                                                                       \
         if(block_ptr[0] == pc)                                                \
@@ -2898,17 +2784,19 @@ u8 *block_lookup_address_##type(u32 pc)                           	      \
           block_address = (u8 *)(block_ptr + 2) + block_prologue_size;        \
           break;                                                              \
         }                                                                     \
+                                                                              \
         block_ptr_address = (u32 **)(block_ptr + 1);                          \
         block_ptr = (u32 *)block_ptr[1];                                      \
       }                                                                       \
-      if(!block_ptr)                                                          \
+                                                                              \
+      if(block_ptr == NULL)                                                   \
       {                                                                       \
         __label__ redo;                                                       \
         s32 translation_result;                                               \
                                                                               \
         redo:                                                                 \
                                                                               \
-        translation_recursion_level++;																				\
+        translation_recursion_level++;                                        \
         ((u32 *)rom_translation_ptr)[0] = pc;                                 \
         ((u32 **)rom_translation_ptr)[1] = NULL;                              \
         *block_ptr_address = (u32 *)rom_translation_ptr;                      \
@@ -2949,11 +2837,12 @@ u8 *block_lookup_address_##type(u32 pc)                           	      \
         sprintf(buffer, "bad jump %x (%x) (%x)\n", pc, reg[REG_PC],           \
          last_instruction);                                                   \
         printf("%s", buffer);                                                 \
+        quit();                                                               \
       }                                                                       \
       block_address = (u8 *)(-1);                                             \
       break;                                                                  \
   }                                                                           \
-                                                               		      \
+                                                                              \
   return block_address;                                                       \
 }                                                                             \
 
@@ -3284,447 +3173,242 @@ block_exit_type block_exits[MAX_EXITS];
 #define thumb_fix_pc()                                                        \
   pc &= ~0x01                                                                 \
 
-s32 translate_block_arm(u32 pc, translation_region_type                    
- translation_region, u32 smc_enable)                                          
-{                                                                             
-  u32 opcode = 0;                                                             
-  u32 last_opcode;                                                            
-  u32 condition;                                                              
-  u32 last_condition;                                                         
-  u32 pc_region = (pc >> 15);                                                 
-  u32 new_pc_region;                                                          
-  u8 *pc_address_block = memory_map_read[pc_region];                          
-  u32 block_start_pc = pc;                                                    
-  u32 block_end_pc = pc;                                                      
-  u32 block_exit_position = 0;                                                
-  s32 block_data_position = 0;                                                
-  u32 external_block_exit_position = 0;                                       
-  u32 branch_target;                                                          
-  u32 cycle_count = 0;                                                        
-  u8 *translation_target;                                                     
-  u8 *backpatch_address = NULL;                                               
-  u8 *translation_ptr = NULL;                                                 
-  u8 *translation_cache_limit = NULL;                                         
-  s32 i;                                                                      
-  u32 flag_status;                                                            
-  block_exit_type external_block_exits[MAX_EXITS];      
-  generate_block_extra_vars_arm();                                         
-  arm_fix_pc();                                                            
-                                                                              
-  if(!pc_address_block)                                                
-    pc_address_block = load_gamepak_page(pc_region & 0x3FF);                  
-                                                                              
-  switch(translation_region)                                                  
-  {                                                                           
-    case TRANSLATION_REGION_RAM:                                              
-      if(pc >= 0x3000000)                                                     
-      {                                                                       
-        if((pc < iwram_code_min) || (iwram_code_min == 0xFFFFFFFF))           
-          iwram_code_min = pc;                                                
-      }                                                                       
-      else                                                                    
-                                                                              
-      if(pc >= 0x2000000)                                                     
-      {                                                                       
-        if((pc < ewram_code_min) || (ewram_code_min == 0xFFFFFFFF))           
-          ewram_code_min = pc;                                                
-      }                                                                       
-                                                                              
-      translation_ptr = ram_translation_ptr;                                  
-      translation_cache_limit =                                               
-       ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -                   
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;                                     
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_ROM:                                              
-      translation_ptr = rom_translation_ptr;                                  
-      translation_cache_limit =                                               
-       rom_translation_cache + ROM_TRANSLATION_CACHE_SIZE -                   
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;                                     
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_BIOS:                                             
-      translation_ptr = bios_translation_ptr;                                 
-      translation_cache_limit = bios_translation_cache +                      
-       BIOS_TRANSLATION_CACHE_SIZE;                                           
-      break;                                                                  
-  }                                                                           
-                                                                              
-  generate_block_prologue();                                                  
-                                                                              
-  /* This is a function because it's used a lot more than it might seem (all  
-     of the data processing functions can access it), and its expansion was   
-     massacreing the compiler. */                                             
-                                                                              
-  if(smc_enable)                                                              
-  {                                                                           
-    scan_block(arm, yes);                                                    
-  }                                                                           
-  else                                                                        
-  {                                                                           
-    scan_block(arm, no);                                                     
-  }                                                                           
-                                                                              
-  for(i = 0; i < block_exit_position; i++)                                    
-  {                                                                           
-    branch_target = block_exits[i].branch_target;                             
-                                                                              
-    if((branch_target > block_start_pc) &&                                    
-     (branch_target < block_end_pc))                                          
-    {                                                                         
-      block_data[(branch_target - block_start_pc) /                           
-       arm_instruction_width].update_cycles = 1;                           
-    }                                                                         
-  }                                                                           
-                                                                              
-  arm_dead_flag_eliminate();                                               
-                                                                              
-  block_exit_position = 0;                                                    
-  block_data_position = 0;                                                    
-                                                                              
-  last_condition = 0x0E;                                                      
-                                                                              
-  while(pc != block_end_pc)                                                   
-  {                                                                           
-    block_data[block_data_position].block_offset = translation_ptr;           
-    arm_base_cycles();
-                                                                              
-    translate_arm_instruction();                                         
-    block_data_position++;                                                    
-                                                                              
-    /* If it went too far the cache needs to be flushed and the process       
-       restarted. Because we might already be nested several stages in        
-       a simple recursive call here won't work, it has to pedal out to        
-       the beginning. */                                                      
-                                                                              
-    if(translation_ptr > translation_cache_limit)                             
-    {                                                                         
-      translation_flush_count++;                                              
-                                                                              
-      switch(translation_region)                                              
-      {                                                                       
-        case TRANSLATION_REGION_RAM:                                          
-          flush_translation_cache_ram();                                      
-          break;                                                              
-                                                                              
-        case TRANSLATION_REGION_ROM:                                          
-          flush_translation_cache_rom();                                      
-          break;                                                              
-                                                                              
-        case TRANSLATION_REGION_BIOS:                                         
-          flush_translation_cache_bios();                                     
-          break;                                                              
-      }                                                                       
-      return -1;                                                              
-    }                                                                         
-                                                                              
-    /* If the next instruction is a block entry point update the              
-       cycle counter and update */                                            
-    if(block_data[block_data_position].update_cycles == 1)                    
-    {                                                                         
-      generate_cycle_update();                                                
-    }                                                                         
-  }                                                                           
-  for(i = 0; i < translation_gate_targets; i++)                               
-  {                                                                           
-    if(pc == translation_gate_target_pc[i])                                   
-    {                                                                         
-      generate_translation_gate(arm);                                        
-      break;                                                                  
-    }                                                                         
-  }                                                                           
-                                                                              
-  for(i = 0; i < block_exit_position; i++)                                    
-  {                                                                           
-    branch_target = block_exits[i].branch_target;                             
-                                                                              
-    if((branch_target >= block_start_pc) && (branch_target < block_end_pc))   
-    {                                                                         
-      /* Internal branch, patch to recorded address */                        
-      translation_target =                                                    
-       block_data[(branch_target - block_start_pc) /                          
-        arm_instruction_width].block_offset;                               
-                                                                              
-      generate_branch_patch_unconditional(block_exits[i].branch_source,       
-       translation_target);                                                   
-    }                                                                         
-    else                                                                      
-    {                                                                         
-      /* External branch, save for later */                                   
-      external_block_exits[external_block_exit_position].branch_target =      
-       branch_target;                                                         
-      external_block_exits[external_block_exit_position].branch_source =      
-       block_exits[i].branch_source;                                          
-      external_block_exit_position++;                                         
-    }                                                                         
-  }                                                                           
-                                                                              
-  switch(translation_region)                                                  
-  {                                                                           
-    case TRANSLATION_REGION_RAM:                                              
-      if(pc >= 0x3000000)                                                     
-      {                                                                       
-        if((pc > iwram_code_max) || (iwram_code_max == 0xFFFFFFFF))           
-          iwram_code_max = pc;                                                
-      }                                                                       
-      else                                                                    
-                                                                              
-      if(pc >= 0x2000000)                                                     
-      {                                                                       
-        if((pc > ewram_code_max) || (ewram_code_max == 0xFFFFFFFF))           
-          ewram_code_max = pc;                                                
-      }                                                                       
-                                                                              
-      ram_translation_ptr = translation_ptr;                                  
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_ROM:                                              
-      rom_translation_ptr = translation_ptr;                                  
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_BIOS:                                             
-      bios_translation_ptr = translation_ptr;                                 
-      break;                                                                  
-  }                                                                           
-                                                                              
-  for(i = 0; i < external_block_exit_position; i++)                           
-  {                                                                           
-    branch_target = external_block_exits[i].branch_target;                    
-    arm_link_block();                                                      
-    if(!translation_target){                                          
-			return -1;
-		}                                                  
-    generate_branch_patch_unconditional(                                      
-     external_block_exits[i].branch_source, translation_target);              
-  }                                                                           
-  return 0;                                                                   
-}
+#define translate_block_builder(type)                                         \
+s32 translate_block_##type(u32 pc, translation_region_type                    \
+ translation_region, u32 smc_enable)                                          \
+{                                                                             \
+  u32 opcode = 0;                                                             \
+  u32 last_opcode;                                                            \
+  u32 condition;                                                              \
+  u32 last_condition;                                                         \
+  u32 pc_region = (pc >> 15);                                                 \
+  u32 new_pc_region;                                                          \
+  u8 *pc_address_block = memory_map_read[pc_region];                          \
+  u32 block_start_pc = pc;                                                    \
+  u32 block_end_pc = pc;                                                      \
+  u32 block_exit_position = 0;                                                \
+  s32 block_data_position = 0;                                                \
+  u32 external_block_exit_position = 0;                                       \
+  u32 branch_target;                                                          \
+  u32 cycle_count = 0;                                                        \
+  u8 *translation_target;                                                     \
+  u8 *backpatch_address = NULL;                                               \
+  u8 *translation_ptr = NULL;                                                 \
+  u8 *translation_cache_limit = NULL;                                         \
+  s32 i;                                                                      \
+  u32 flag_status;                                                            \
+  block_exit_type external_block_exits[MAX_EXITS];                            \
+  generate_block_extra_vars_##type();                                         \
+  type##_fix_pc();                                                            \
+                                                                              \
+  if(pc_address_block == NULL)                                                \
+    pc_address_block = load_gamepak_page(pc_region & 0x3FF);                  \
+                                                                              \
+  switch(translation_region)                                                  \
+  {                                                                           \
+    case TRANSLATION_REGION_RAM:                                              \
+      if(pc >= 0x3000000)                                                     \
+      {                                                                       \
+        if((pc < iwram_code_min) || (iwram_code_min == 0xFFFFFFFF))           \
+          iwram_code_min = pc;                                                \
+      }                                                                       \
+      else                                                                    \
+                                                                              \
+      if(pc >= 0x2000000)                                                     \
+      {                                                                       \
+        if((pc < ewram_code_min) || (ewram_code_min == 0xFFFFFFFF))           \
+          ewram_code_min = pc;                                                \
+      }                                                                       \
+                                                                              \
+      translation_ptr = ram_translation_ptr;                                  \
+      translation_cache_limit =                                               \
+       ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -                   \
+       TRANSLATION_CACHE_LIMIT_THRESHOLD;                                     \
+      break;                                                                  \
+                                                                              \
+    case TRANSLATION_REGION_ROM:                                              \
+      translation_ptr = rom_translation_ptr;                                  \
+      translation_cache_limit =                                               \
+       rom_translation_cache + ROM_TRANSLATION_CACHE_SIZE -                   \
+       TRANSLATION_CACHE_LIMIT_THRESHOLD;                                     \
+      break;                                                                  \
+                                                                              \
+    case TRANSLATION_REGION_BIOS:                                             \
+      translation_ptr = bios_translation_ptr;                                 \
+      translation_cache_limit = bios_translation_cache +                      \
+       BIOS_TRANSLATION_CACHE_SIZE;                                           \
+      break;                                                                  \
+  }                                                                           \
+                                                                              \
+  generate_block_prologue();                                                  \
+                                                                              \
+  /* This is a function because it's used a lot more than it might seem (all  \
+     of the data processing functions can access it), and its expansion was   \
+     massacreing the compiler. */                                             \
+                                                                              \
+  if(smc_enable)                                                              \
+  {                                                                           \
+    scan_block(type, yes);                                                    \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    scan_block(type, no);                                                     \
+  }                                                                           \
+                                                                              \
+  for(i = 0; i < block_exit_position; i++)                                    \
+  {                                                                           \
+    branch_target = block_exits[i].branch_target;                             \
+                                                                              \
+    if((branch_target > block_start_pc) &&                                    \
+     (branch_target < block_end_pc))                                          \
+    {                                                                         \
+      block_data[(branch_target - block_start_pc) /                           \
+       type##_instruction_width].update_cycles = 1;                           \
+    }                                                                         \
+  }                                                                           \
+                                                                              \
+  type##_dead_flag_eliminate();                                               \
+                                                                              \
+  block_exit_position = 0;                                                    \
+  block_data_position = 0;                                                    \
+                                                                              \
+  last_condition = 0x0E;                                                      \
+                                                                              \
+  while(pc != block_end_pc)                                                   \
+  {                                                                           \
+    block_data[block_data_position].block_offset = translation_ptr;           \
+    type##_base_cycles();                                                     \
+    /*generate_step_debug();*/                                                \
+                                                                              \
+    translate_##type##_instruction();                                         \
+    block_data_position++;                                                    \
+                                                                              \
+    /* If it went too far the cache needs to be flushed and the process       \
+       restarted. Because we might already be nested several stages in        \
+       a simple recursive call here won't work, it has to pedal out to        \
+       the beginning. */                                                      \
+                                                                              \
+    if(translation_ptr > translation_cache_limit)                             \
+    {                                                                         \
+      translation_flush_count++;                                              \
+                                                                              \
+      switch(translation_region)                                              \
+      {                                                                       \
+        case TRANSLATION_REGION_RAM:                                          \
+          flush_translation_cache_ram();                                      \
+          break;                                                              \
+                                                                              \
+        case TRANSLATION_REGION_ROM:                                          \
+          flush_translation_cache_rom();                                      \
+          break;                                                              \
+                                                                              \
+        case TRANSLATION_REGION_BIOS:                                         \
+          flush_translation_cache_bios();                                     \
+          break;                                                              \
+      }                                                                       \
+                                                                              \
+      return -1;                                                              \
+    }                                                                         \
+                                                                              \
+    /* If the next instruction is a block entry point update the              \
+       cycle counter and update */                                            \
+    if(block_data[block_data_position].update_cycles == 1)                    \
+    {                                                                         \
+      generate_cycle_update();                                                \
+    }                                                                         \
+  }                                                                           \
+  for(i = 0; i < translation_gate_targets; i++)                               \
+  {                                                                           \
+    if(pc == translation_gate_target_pc[i])                                   \
+    {                                                                         \
+      generate_translation_gate(type);                                        \
+      break;                                                                  \
+    }                                                                         \
+  }                                                                           \
+                                                                              \
+  for(i = 0; i < block_exit_position; i++)                                    \
+  {                                                                           \
+    branch_target = block_exits[i].branch_target;                             \
+                                                                              \
+    if((branch_target >= block_start_pc) && (branch_target < block_end_pc))   \
+    {                                                                         \
+      /* Internal branch, patch to recorded address */                        \
+      translation_target =                                                    \
+       block_data[(branch_target - block_start_pc) /                          \
+        type##_instruction_width].block_offset;                               \
+                                                                              \
+      generate_branch_patch_unconditional(block_exits[i].branch_source,       \
+       translation_target);                                                   \
+    }                                                                         \
+    else                                                                      \
+    {                                                                         \
+      /* External branch, save for later */                                   \
+      external_block_exits[external_block_exit_position].branch_target =      \
+       branch_target;                                                         \
+      external_block_exits[external_block_exit_position].branch_source =      \
+       block_exits[i].branch_source;                                          \
+      external_block_exit_position++;                                         \
+    }                                                                         \
+  }                                                                           \
+                                                                              \
+  switch(translation_region)                                                  \
+  {                                                                           \
+    case TRANSLATION_REGION_RAM:                                              \
+      if(pc >= 0x3000000)                                                     \
+      {                                                                       \
+        if((pc > iwram_code_max) || (iwram_code_max == 0xFFFFFFFF))           \
+          iwram_code_max = pc;                                                \
+      }                                                                       \
+      else                                                                    \
+                                                                              \
+      if(pc >= 0x2000000)                                                     \
+      {                                                                       \
+        if((pc > ewram_code_max) || (ewram_code_max == 0xFFFFFFFF))           \
+          ewram_code_max = pc;                                                \
+      }                                                                       \
+                                                                              \
+      ram_translation_ptr = translation_ptr;                                  \
+      break;                                                                  \
+                                                                              \
+    case TRANSLATION_REGION_ROM:                                              \
+      rom_translation_ptr = translation_ptr;                                  \
+      break;                                                                  \
+                                                                              \
+    case TRANSLATION_REGION_BIOS:                                             \
+      bios_translation_ptr = translation_ptr;                                 \
+      break;                                                                  \
+  }                                                                           \
+                                                                              \
+  for(i = 0; i < external_block_exit_position; i++)                           \
+  {                                                                           \
+    branch_target = external_block_exits[i].branch_target;                    \
+    type##_link_block();                                                      \
+    if(translation_target == NULL)                                            \
+      return -1;                                                              \
+    generate_branch_patch_unconditional(                                      \
+     external_block_exits[i].branch_source, translation_target);              \
+  }                                                                           \
+                                                                              \
+  return 0;                                                                   \
+}                                                                             \
 
-s32 translate_block_thumb(u32 pc, translation_region_type                    
- translation_region, u32 smc_enable)                                          
-{                                                                             
-  u32 opcode = 0;                                                             
-  u32 last_opcode;                                                            
-  u32 condition;                                                              
-  u32 last_condition;                                                         
-  u32 pc_region = (pc >> 15);                                                 
-  u32 new_pc_region;                                                          
-  u8 *pc_address_block = memory_map_read[pc_region];                          
-  u32 block_start_pc = pc;                                                    
-  u32 block_end_pc = pc;                                                      
-  u32 block_exit_position = 0;                                                
-  s32 block_data_position = 0;                                                
-  u32 external_block_exit_position = 0;                                       
-  u32 branch_target;                                                          
-  u32 cycle_count = 0;                                                        
-  u8 *translation_target;                                                     
-  u8 *backpatch_address = NULL;                                               
-  u8 *translation_ptr = NULL;                                                 
-  u8 *translation_cache_limit = NULL;                                         
-  s32 i;                                                                      
-  u32 flag_status;                                                            
-  block_exit_type external_block_exits[MAX_EXITS];         
-  generate_block_extra_vars_thumb();                                         
-  thumb_fix_pc();                                                            
-                                                                              
-  if(!pc_address_block)                                                
-    pc_address_block = load_gamepak_page(pc_region & 0x3FF);                  
-                                                                              
-  switch(translation_region)                                                  
-  {                                                                           
-    case TRANSLATION_REGION_RAM:                                              
-      if(pc >= 0x3000000)                                                     
-      {                                                                       
-        if((pc < iwram_code_min) || (iwram_code_min == 0xFFFFFFFF))           
-          iwram_code_min = pc;                                                
-      }                                                                       
-      else                                                                    
-                                                                              
-      if(pc >= 0x2000000)                                                     
-      {                                                                       
-        if((pc < ewram_code_min) || (ewram_code_min == 0xFFFFFFFF))           
-          ewram_code_min = pc;                                                
-      }                                                                       
-                                                                              
-      translation_ptr = ram_translation_ptr;                                  
-      translation_cache_limit =                                               
-       ram_translation_cache + RAM_TRANSLATION_CACHE_SIZE -                   
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;                                     
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_ROM:                                              
-      translation_ptr = rom_translation_ptr;                                  
-      translation_cache_limit =                                               
-       rom_translation_cache + ROM_TRANSLATION_CACHE_SIZE -                   
-       TRANSLATION_CACHE_LIMIT_THRESHOLD;                                     
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_BIOS:                                             
-      translation_ptr = bios_translation_ptr;                                 
-      translation_cache_limit = bios_translation_cache +                      
-       BIOS_TRANSLATION_CACHE_SIZE;                                           
-      break;                                                                  
-  }                                                                           
-                                                                              
-  generate_block_prologue();                                                  
-                                                                              
-  /* This is a function because it's used a lot more than it might seem (all  
-     of the data processing functions can access it), and its expansion was   
-     massacreing the compiler. */                                             
-                                                                              
-  if(smc_enable)                                                              
-  {                                                                           
-    scan_block(thumb, yes);                                                    
-  }                                                                           
-  else                                                                        
-  {                                                                           
-    scan_block(thumb, no);                                                     
-  }                                                                           
-                                                                              
-  for(i = 0; i < block_exit_position; i++)                                    
-  {                                                                           
-    branch_target = block_exits[i].branch_target;                             
-                                                                              
-    if((branch_target > block_start_pc) &&                                    
-     (branch_target < block_end_pc))                                          
-    {                                                                         
-      block_data[(branch_target - block_start_pc) /                           
-       thumb_instruction_width].update_cycles = 1;                           
-    }                                                                         
-  }                                                                           
-                                                                              
-  thumb_dead_flag_eliminate();                                               
-                                                                              
-  block_exit_position = 0;                                                    
-  block_data_position = 0;                                                    
-                                                                              
-  last_condition = 0x0E;                                                      
-                                                                              
-  while(pc != block_end_pc)                                                   
-  {                                                                           
-    block_data[block_data_position].block_offset = translation_ptr;           
-    thumb_base_cycles();
-                                                                              
-    translate_thumb_instruction();                                         
-    block_data_position++;                                                    
-                                                                              
-    /* If it went too far the cache needs to be flushed and the process       
-       restarted. Because we might already be nested several stages in        
-       a simple recursive call here won't work, it has to pedal out to        
-       the beginning. */                                                      
-                                                                              
-    if(translation_ptr > translation_cache_limit)                             
-    {                                                                         
-      translation_flush_count++;                                              
-                                                                              
-      switch(translation_region)                                              
-      {                                                                       
-        case TRANSLATION_REGION_RAM:                                          
-          flush_translation_cache_ram();                                      
-          break;                                                              
-                                                                              
-        case TRANSLATION_REGION_ROM:                                          
-          flush_translation_cache_rom();                                      
-          break;                                                              
-                                                                              
-        case TRANSLATION_REGION_BIOS:                                         
-          flush_translation_cache_bios();                                     
-          break;                                                              
-      }                                                                       
-      return -1;                                                              
-    }                                                                         
-                                                                              
-    /* If the next instruction is a block entry point update the              
-       cycle counter and update */                                            
-    if(block_data[block_data_position].update_cycles == 1)                    
-    {                                                                         
-      generate_cycle_update();                                                
-    }                                                                         
-  }                                                                           
-  for(i = 0; i < translation_gate_targets; i++)                               
-  {                                                                           
-    if(pc == translation_gate_target_pc[i])                                   
-    {                                                                         
-      generate_translation_gate(thumb);                                        
-      break;                                                                  
-    }                                                                         
-  }                                                                           
-                                                                              
-  for(i = 0; i < block_exit_position; i++)                                    
-  {                                                                           
-    branch_target = block_exits[i].branch_target;                             
-                                                                              
-    if((branch_target >= block_start_pc) && (branch_target < block_end_pc))   
-    {                                                                         
-      /* Internal branch, patch to recorded address */                        
-      translation_target =                                                    
-       block_data[(branch_target - block_start_pc) /                          
-        thumb_instruction_width].block_offset;                               
-                                                                              
-      generate_branch_patch_unconditional(block_exits[i].branch_source,       
-       translation_target);                                                   
-    }                                                                         
-    else                                                                      
-    {                                                                         
-      /* External branch, save for later */                                   
-      external_block_exits[external_block_exit_position].branch_target =      
-       branch_target;                                                         
-      external_block_exits[external_block_exit_position].branch_source =      
-       block_exits[i].branch_source;                                          
-      external_block_exit_position++;                                         
-    }                                                                         
-  }                                                                           
-                                                                              
-  switch(translation_region)                                                  
-  {                                                                           
-    case TRANSLATION_REGION_RAM:                                              
-      if(pc >= 0x3000000)                                                     
-      {                                                                       
-        if((pc > iwram_code_max) || (iwram_code_max == 0xFFFFFFFF))           
-          iwram_code_max = pc;                                                
-      }                                                                       
-      else                                                                    
-                                                                              
-      if(pc >= 0x2000000)                                                     
-      {                                                                       
-        if((pc > ewram_code_max) || (ewram_code_max == 0xFFFFFFFF))           
-          ewram_code_max = pc;                                                
-      }                                                                       
-                                                                              
-      ram_translation_ptr = translation_ptr;                                  
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_ROM:                                              
-      rom_translation_ptr = translation_ptr;                                  
-      break;                                                                  
-                                                                              
-    case TRANSLATION_REGION_BIOS:                                             
-      bios_translation_ptr = translation_ptr;                                 
-      break;                                                                  
-  }                                                                           
-                                                                              
-  for(i = 0; i < external_block_exit_position; i++)                           
-  {                                                                           
-    branch_target = external_block_exits[i].branch_target;                    
-    thumb_link_block();                                                      
-    if(!translation_target){         
-      return -1;           
-		}                                                   
-    generate_branch_patch_unconditional(                                      
-     external_block_exits[i].branch_source, translation_target);              
-  }                                                                           
-  return 0;
-}
+translate_block_builder(arm);
+translate_block_builder(thumb);
 
-void flush_translation_cache_ram(void)
+void flush_translation_cache_ram()
 {
   flush_ram_count++;
 /*  printf("ram flush %d (pc %x), %x to %x, %x to %x\n",
    flush_ram_count, reg[REG_PC], iwram_code_min, iwram_code_max,
    ewram_code_min, ewram_code_max); */
 
-  invalidate_icache_region(ram_translation_cache, (ram_translation_ptr - ram_translation_cache) + 0x100);
+#ifndef PC_BUILD
+  invalidate_icache_region(ram_translation_cache,
+   (ram_translation_ptr - ram_translation_cache) + 0x100);
+#endif
+#ifdef ARM_ARCH
   last_ram_translation_ptr = ram_translation_cache;
+#endif
   ram_translation_ptr = ram_translation_cache;
   ram_block_tag_top = 0x0101;
   if(iwram_code_min != 0xFFFFFFFF)
@@ -3759,7 +3443,9 @@ void flush_translation_cache_ram(void)
     else
     {
       for(i = ewram_code_min_page + 1; i < ewram_code_max_page; i++)
+      {
         memset(ewram + (i * 0x10000), 0, 0x8000);
+      }
 
       memset(ewram, 0, ewram_code_max_offset);
     }
@@ -3771,31 +3457,38 @@ void flush_translation_cache_ram(void)
   ewram_code_max = 0xFFFFFFFF;
 }
 
-void flush_translation_cache_rom(void)
+void flush_translation_cache_rom()
 {
-  invalidate_icache_region(rom_translation_cache, rom_translation_ptr - rom_translation_cache + 0x100);
-
+#ifndef PC_BUILD
+  invalidate_icache_region(rom_translation_cache,
+   rom_translation_ptr - rom_translation_cache + 0x100);
+#endif
+#ifdef ARM_ARCH
   last_rom_translation_ptr = rom_translation_cache;
-  rom_translation_ptr      = rom_translation_cache;
+#endif
 
+  rom_translation_ptr = rom_translation_cache;
   memset(rom_branch_hash, 0, sizeof(rom_branch_hash));
 }
 
-void flush_translation_cache_bios(void)
+void flush_translation_cache_bios()
 {
-  invalidate_icache_region(bios_translation_cache, bios_translation_ptr - bios_translation_cache + 0x100);
+#ifndef PC_BUILD
+  invalidate_icache_region(bios_translation_cache,
+   bios_translation_ptr - bios_translation_cache + 0x100);
+#endif
+#ifdef ARM_ARCH
+  last_bios_translation_ptr = bios_translation_cache;
+#endif
 
   bios_block_tag_top = 0x0101;
-
-  last_bios_translation_ptr = bios_translation_cache;
   bios_translation_ptr = bios_translation_cache;
-
   memset(bios_rom + 0x4000, 0, 0x4000);
 }
 
 #define cache_dump_prefix ""
 
-void dump_translation_cache(void)
+void dump_translation_cache()
 {
   file_open(ram_cache, cache_dump_prefix "ram_cache.bin", write);
   file_write(ram_cache, ram_translation_cache,
