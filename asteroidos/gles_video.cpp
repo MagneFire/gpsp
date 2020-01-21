@@ -138,7 +138,7 @@ void HWComposer::present(HWComposerNativeWindowBuffer *buffer)
 
 	if (oldretire != -1)
 	{   
-		sync_wait(oldretire, -1);
+		//sync_wait(oldretire, -1);
 		close(oldretire);
 	}
 } 
@@ -499,6 +499,9 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
 
 	assert(eglMakeCurrent((EGLDisplay) display, surface, surface, context) == EGL_TRUE);
 
+	const char *version = (const char *)glGetString(GL_VERSION);
+	assert(version);
+	printf("%s\n",version);
 
 	gles2_create();
 

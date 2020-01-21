@@ -86,11 +86,11 @@ void gpsp_plat_init(void)
 
 void gpsp_plat_quit(void)
 {
-    if (video_started) {
-	video_close();
-	free(video_buff);
-       video_started=0;
-    }
+  if (video_started) {
+    video_close();
+    free(video_buff);
+    video_started=0;
+  }
   SDL_Quit();
 }
 
@@ -107,13 +107,15 @@ void fb_wait_vsync(void)
 
 void fb_set_mode(int w, int h, int buffers, int scale,int filter, int filter2)
 {
-    if (video_started) {
-	video_close();
-	free(video_buff);
-    }
-    video_buff=malloc(w*h*sizeof(uint16_t));
-    memset(video_buff,0,w*h*sizeof(uint16_t));
+  if (video_started) {
+    video_set_filter(filter);
+    free(video_buff);
+  }
+  video_buff=malloc(w*h*sizeof(uint16_t));
+  memset(video_buff,0,w*h*sizeof(uint16_t));
+  if (!video_started) {
     video_init(w,h,filter);
     video_started=1;
+  }
 }
 // vim:shiftwidth=2:expandtab

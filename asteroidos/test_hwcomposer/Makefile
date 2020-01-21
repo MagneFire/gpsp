@@ -9,7 +9,7 @@ BIN       = glestest
 
 # Platform specific definitions 
 
-CFLAGS+=-D_LINUX
+CFLAGS+=-D_LINUX -DQCOM_BSP -DHWC_PLUGIN_HAVE_HWCOMPOSER1_API
 
 #LIBS +=-L$(SDKSTAGE)/opt/vc/lib/ -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt 
 LIBS +=-lpthread

@@ -16,7 +16,7 @@ BIN       = gpsp
 # Platform specific definitions 
 
 VPATH      += .. ../arm
-CFLAGS     += -DARM_ARCH -DRPI_BUILD -Wall
+CFLAGS     += -DARM_ARCH -DRPI_BUILD -DQCOM_BSP -DHWC_PLUGIN_HAVE_HWCOMPOSER1_API  -Wall
 CFLAGS     += -O3 -marm -mcpu=cortex-a7
 CFLAGS     += `pkg-config sdl --cflags`
 CFLAGS+=-Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed
