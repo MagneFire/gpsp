@@ -753,6 +753,13 @@ u32 gamepad_config_line_to_button[] =
 
 #endif
 
+#ifdef ASTEROID_BUILD
+
+u32 gamepad_config_line_to_button[] =
+ { 0, 2, 1, 3, 8, 9, 10, 11, 6, 7, 4, 5, 12, 13, 14, 15 };
+
+#endif
+
 static const char *scale_options[] =
 {
 #ifdef PSP_BUILD
@@ -766,7 +773,7 @@ static const char *scale_options[] =
   "unscaled", "2x", "3x", "fullscreen"
 #elif defined(GP2X_BUILD)
   "unscaled 3:2", "scaled 3:2", "fullscreen", "scaled 3:2 (software)"
-#elif defined(RPI_BUILD)
+#elif defined(RPI_BUILD) || defined(ASTEROID_BUILD)
   "fullscreen"
 #else
   "unscaled 3:2"
@@ -852,7 +859,7 @@ s32 load_game_config_file()
   if(file_loaded)
     return 0;
 
-#ifdef RPI_BUILD
+#if defined(RPI_BUILD)
   current_frameskip_type = manual_frameskip;
   frameskip_value = 1;
 #else
@@ -1341,7 +1348,7 @@ u32 menu(u16 *original_screen)
   // Marker for help information, don't go past this mark (except \n)------*
   menu_option_type graphics_sound_options[] = 
  {
-#ifndef RPI_BUILD
+#if !defined(RPI_BUILD) && !defined(ASTEROID_BUILD)
     string_selection_option(NULL, "Display scaling", scale_options,
      (u32 *)(&screen_scale),
      sizeof(scale_options) / sizeof(scale_options[0]),
@@ -1585,7 +1592,7 @@ u32 menu(u16 *original_screen)
 
 #endif
 
-#if defined(PC_BUILD) || defined(RPI_BUILD)
+#if defined(PC_BUILD) || defined(RPI_BUILD) || defined(ASTEROID_BUILD)
 
   menu_option_type gamepad_config_options[] =
   {

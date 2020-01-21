@@ -38,7 +38,7 @@ debug_state current_debug_state = RUN;
 
 //u32 breakpoint_value = 0;
 
-#ifdef RPI_BUILD
+#if defined(RPI_BUILD)
 frameskip_type current_frameskip_type = manual_frameskip; //manual; //auto_frameskip;
 u32 global_cycles_per_instruction = 1;
 #else
@@ -47,7 +47,7 @@ u32 global_cycles_per_instruction = 1;
 #endif
 
 u32 random_skip = 0;
-u32 fps_debug = 0;
+u32 fps_debug = 1;
 
 u32 frameskip_value = 2;
 
@@ -647,7 +647,7 @@ u32 update_gba()
           if(fps_debug)
           {
             char print_buffer[32];
-            sprintf(print_buffer, "%2d (%2d)", fps, frames_drawn);
+            sprintf(print_buffer, "      %2d (%2d)", fps, frames_drawn);
             print_string(print_buffer, 0xFFFF, 0x000, 0, 0);
           }
           if(!synchronize_flag)
@@ -827,7 +827,7 @@ void synchronize()
   }
   else if (synchronize_flag)
   {
-#if defined(PND_BUILD) || defined(RPI_BUILD)
+#if defined(PND_BUILD) || defined(RPI_BUILD) || defined(ASTEROID_BUILD)
     fb_wait_vsync();
 #elif !defined(GP2X_BUILD) // sleeping on GP2X is a bad idea
     delay_us((u64)virtual_frame_count * 50000 / 3 - new_ticks + 2);
@@ -873,7 +873,7 @@ void synchronize()
 
   interval_skipped_frames += skip_next_frame;
 
-#if !defined(GP2X_BUILD) && !defined(PND_BUILD) && !defined(RPI_BUILD)
+#if !defined(GP2X_BUILD) && !defined(PND_BUILD) && !defined(RPI_BUILD) && !defined(ASTEROID_BUILD)
   char char_buffer[64];
   sprintf(char_buffer, "gpSP: %2d (%2d) fps", fps, frames_drawn);
   SDL_WM_SetCaption(char_buffer, "gpSP");

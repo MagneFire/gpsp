@@ -555,7 +555,7 @@ void init_input()
 #endif
 
 
-#if defined(RPI_BUILD)
+#if defined(RPI_BUILD) || defined(ASTEROID_BUILD)
 
 u32 key_map(SDLKey key_sym)
 {
@@ -638,7 +638,8 @@ u32 key_map(SDLKey key_sym)
   }
 }
 #endif
-#if defined(PC_BUILD) || defined(RPI_BUILD)
+
+#if defined(PC_BUILD) || defined(RPI_BUILD) || defined(ASTEROID_BUILD)
 
 u32 joy_map(u32 button)
 {
@@ -717,7 +718,7 @@ gui_action_type get_gui_input()
       }
     }
     break;
-#ifdef RPI_BUILD
+#if defined(RPI_BUILD) || defined(ASTEROID_BUILD)
     case SDL_JOYBUTTONDOWN:
     {
       switch (event.jbutton.button)
@@ -875,7 +876,7 @@ u32 update_input()
         key &= ~(joy_map(event.jbutton.button));
         break;
       }
-#ifdef RPI_BUILD
+#if defined(RPI_BUILD) || defined(ASTEROID_BUILD)
       case SDL_JOYAXISMOTION:
       {
          if (event.jaxis.axis==0) { //Left-Right

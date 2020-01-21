@@ -105,7 +105,7 @@ const u32 screen_pitch = 320;
 #define get_screen_pitch()                                                    \
   screen_pitch                                                                \
 
-#elif defined(PND_BUILD) || defined(RPI_BUILD)
+#elif defined(PND_BUILD) || defined(RPI_BUILD) || defined(ASTEROID_BUILD)
 
 static u16 *screen_pixels = NULL;
 
@@ -3388,7 +3388,7 @@ no_clean:
   screen_pixels = (u16 *)gpsp_gp2x_screen + screen_offset;
 }
 
-#elif defined(PND_BUILD) || defined(RPI_BUILD)
+#elif defined(PND_BUILD) || defined(RPI_BUILD) || defined(ASTEROID_BUILD)
 
 void flip_screen()
 {
@@ -3604,7 +3604,7 @@ void init_video()
   GE_CMD(NOP, 0);
 }
 
-#elif defined(WIZ_BUILD) || defined(PND_BUILD) || defined (RPI_BUILD)
+#elif defined(WIZ_BUILD) || defined(PND_BUILD) || defined (RPI_BUILD) || defined(ASTEROID_BUILD)
 
 void init_video()
 {
@@ -3800,7 +3800,7 @@ void clear_screen(u16 color)
     *p++ = col;
 }
 
-#elif defined(PND_BUILD) || defined(RPI_BUILD)
+#elif defined(PND_BUILD) || defined(RPI_BUILD) || defined(ASTEROID_BUILD)
 
 void video_resolution_large()
 {

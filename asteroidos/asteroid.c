@@ -21,8 +21,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "gles_video.h"
-#include "rpi.h"
-//#include "bcm_host.h"
+#include "asteroid.h"
 
 
 

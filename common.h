@@ -266,4 +266,8 @@ typedef u32 fixed8_24;
   #include "raspberrypi/rpi.h"
 #endif
 
+#ifdef ASTEROID_BUILD
+  #include "asteroidos/asteroid.h"
+#endif
+
 #endif
