@@ -47,7 +47,7 @@ u32 global_cycles_per_instruction = 1;
 #endif
 
 u32 random_skip = 0;
-u32 fps_debug = 1;
+u32 fps_debug = 0;
 
 u32 frameskip_value = 2;
 

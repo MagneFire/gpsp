@@ -759,7 +759,52 @@ gui_action_type get_gui_input()
   return gui_action;
 }
 
+
+SDL_Joystick *ctrl;
+
+
 u32 update_input()
+{
+  s16 axis_input[2];
+  u32 new_key = 0;
+  SDL_JoystickUpdate();
+  axis_input[0] = SDL_JoystickGetAxis(ctrl, 0);
+  axis_input[1] = SDL_JoystickGetAxis(ctrl, 1);
+
+  new_key &= ~(BUTTON_LEFT|BUTTON_RIGHT);
+  if (axis_input[0] < -3200)  new_key |= BUTTON_LEFT;
+  else if (axis_input[0] > 3200)  new_key |= BUTTON_RIGHT;
+  new_key &= ~(BUTTON_UP|BUTTON_DOWN);
+  if (axis_input[1] < -3200)  new_key |= BUTTON_UP;
+  else if (axis_input[1] > 3200)  new_key |= BUTTON_DOWN;
+
+  if (SDL_JoystickGetButton(ctrl, 1)) {
+    new_key |= BUTTON_A;
+  }
+  if (SDL_JoystickGetButton(ctrl, 0)) {
+    new_key |= BUTTON_B;
+  }
+  if (SDL_JoystickGetButton(ctrl, 4)) {
+    new_key |= BUTTON_START;
+  }
+  if (SDL_JoystickGetButton(ctrl, 3)) {
+    new_key |= BUTTON_SELECT;
+  }
+  if (SDL_JoystickGetButton(ctrl, 11)) {
+    quit();
+  }
+
+  if((new_key | key) != key)
+    trigger_key(new_key);
+
+  key = new_key;
+
+  io_registers[REG_P1] = (~key) & 0x3FF;
+
+  return 0;
+}
+
+u32 update_input1()
 {
   SDL_Event event;
 
@@ -903,11 +948,14 @@ u32 update_input()
 void init_input()
 {
   u32 joystick_count = SDL_NumJoysticks();
+  printf("Number of joysticks found: %d\r\n", joystick_count);
 
   if(joystick_count > 0)
   {
-    SDL_JoystickOpen(0);
+    ctrl = SDL_JoystickOpen(0);
     SDL_JoystickEventState(SDL_ENABLE);
+
+    printf("Joystick Name: %s\n", SDL_JoystickName(0));
   }
 }
 
