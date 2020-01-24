@@ -257,7 +257,12 @@ int main(int argc, char *argv[])
 
   init_video();
 
-  sprintf(bios_filename, "%s" PATH_SEPARATOR "%s", main_path, "gba_bios.bin");
+
+  sprintf(bios_filename, getenv("GBA_BIOS"));
+  // Check if a gba_bios.bin path was supplied via environment variable, if not check in exec path.
+  if (bios_filename[0] == '\0') {
+    sprintf(bios_filename, "%s" PATH_SEPARATOR "%s", main_path, "gba_bios.bin");
+  }
   ret = load_bios(bios_filename);
   if (ret != 0)
     ret = load_bios("gba_bios.bin");
@@ -347,9 +352,11 @@ int main(int argc, char *argv[])
   {
     char load_filename[512];
     switch_to_romdir();
-    if(load_file(file_ext, load_filename) == -1)
+
+    sprintf(load_filename, getenv("GAME_PATH"));
+    if (load_filename[0] == '\0')
     {
-      menu(copy_screen());
+        exit(-1);
     }
     else
     {
