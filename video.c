@@ -3804,16 +3804,7 @@ void clear_screen(u16 color)
 
 void video_resolution_large()
 {
-#if defined (RPI_BUILD)
-  resolution_width = 480;
-#else
-  resolution_width = 400;
-#endif
-  resolution_height = 272;
-
-  fb_set_mode(resolution_width, resolution_height, 1, 15, screen_filter, screen_filter2);
-  flip_screen();
-  clear_screen(0);
+  video_resolution_small();
 }
 
 void video_resolution_small()

@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-//#include "bcm_host.h"
 #include "GLES/gl.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
@@ -96,9 +95,6 @@ static const GLushort indices[] =
 
 static const int kVertexCount = 4;
 static const int kIndexCount = 6;
-
-
-
 
 class HWComposer : public HWComposerNativeWindow
 {
@@ -304,30 +300,12 @@ static EGLDisplay display = NULL;
 static EGLSurface surface = NULL;
 static EGLContext context = NULL;
 static HWComposer *win = NULL;
-//static EGL_DISPMANX_WINDOW_T nativewindow;
 
 static GLfloat proj[4][4];
 static GLint filter_min;
 static GLint filter_mag;
 
-void video_set_filter(uint32_t filter) {
-	if (filter==0) {
-	    filter_min = GL_NEAREST;
-	    filter_mag = GL_NEAREST;
-	} else  {
-	    filter_min = GL_LINEAR;
-	    filter_mag = GL_LINEAR;
-	}
-}
-
-void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
-{
-	if ((_width==0)||(_height==0))
-		return;
-
-	frame_width = _width;
-	frame_height = _height;
-
+void hwcomposer_init() {
 	EGLConfig ecfg;
 	EGLint num_config;
 	EGLint attr[] = {       // some attributes to set up our egl-interface
@@ -502,6 +480,27 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
 	const char *version = (const char *)glGetString(GL_VERSION);
 	assert(version);
 	printf("%s\n",version);
+}
+
+void video_set_filter(uint32_t filter) {
+	if (filter==0) {
+	    filter_min = GL_NEAREST;
+	    filter_mag = GL_NEAREST;
+	} else  {
+	    filter_min = GL_LINEAR;
+	    filter_mag = GL_LINEAR;
+	}
+}
+
+void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
+{
+	if ((_width==0)||(_height==0))
+		return;
+
+	frame_width = _width;
+	frame_height = _height;
+
+	hwcomposer_init();
 
 	gles2_create();
 
