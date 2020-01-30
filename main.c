@@ -257,6 +257,7 @@ int main(int argc, char *argv[])
 
   init_video();
 
+  init_input();
 
   sprintf(bios_filename, getenv("GBA_BIOS"));
   // Check if a gba_bios.bin path was supplied via environment variable, if not check in exec path.
@@ -328,7 +329,6 @@ int main(int argc, char *argv[])
   init_main();
   init_sound(1);
 
-  init_input();
 
   video_resolution_large();
 

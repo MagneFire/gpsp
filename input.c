@@ -668,7 +668,7 @@ u32 joy_map(u32 button)
   }
 }
 
-gui_action_type get_gui_input()
+gui_action_type get_gui_input1()
 {
   SDL_Event event;
   gui_action_type gui_action = CURSOR_NONE;
@@ -762,6 +762,32 @@ gui_action_type get_gui_input()
 
 SDL_Joystick *ctrl;
 
+
+gui_action_type get_gui_input()
+{
+  s16 axis;
+  delay_us(30000);
+
+  SDL_JoystickUpdate();
+
+  for (unsigned int i=0; i < SDL_JoystickNumAxes(ctrl); ++i) {
+    axis = SDL_JoystickGetAxis(ctrl, i);
+
+    if (axis < -3200) {
+      return CURSOR_EXIT;
+    } else if (axis > 3200) {
+      return CURSOR_EXIT;
+    }
+  }
+
+  for (unsigned int i=0; i < SDL_JoystickNumButtons(ctrl); ++i) {
+    if (SDL_JoystickGetButton(ctrl, i)) {
+      return CURSOR_EXIT;
+    }
+  }
+
+  return CURSOR_NONE;
+}
 
 u32 update_input()
 {
