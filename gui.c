@@ -1628,26 +1628,26 @@ u32 menu(u16 *original_screen)
      "Select to enter a menu for loading, saving, and\n"
      "viewing the currently active savestate for this game\n"
      "(or to load a savestate file from another game)", 4),
-    submenu_option(&gamepad_config_menu, "Configure gamepad input",
+    /*submenu_option(&gamepad_config_menu, "Configure gamepad input",
      "Select to change the in-game behavior of buttons\n"
      "and d-pad.", 6),
 #ifndef WIZ_BUILD
     submenu_option(&analog_config_menu, "Configure analog input",
      "Select to change the in-game behavior of the analog nub.", 7),
-#endif
+#endif*/
     submenu_option(&cheats_misc_menu, "Cheats and Miscellaneous options",
      "Select to manage cheats, set backup behavior,\n"
-     "and set device clock speed.", 9),
+     "and set device clock speed.", 5),
     action_option(menu_load, NULL, "Load new game",
      "Select to load a new game\n"
-     "(will exit a game if currently playing).", 11),
+     "(will exit a game if currently playing).", 7),
     action_option(menu_restart, NULL, "Restart game",
      "Select to reset the GBA with the current game\n"
      "loaded.", 12),
     action_option(menu_exit, NULL, "Return to game",
-     "Select to exit this menu and resume gameplay.", 13),
+     "Select to exit this menu and resume gameplay.", 8),
     action_option(menu_quit, NULL, "Exit gpSP",
-     "Select to exit gpSP and return to the menu.", 15)
+     "Select to exit gpSP and return to the menu.", 9)
   };
 
   make_menu(main, submenu_main, NULL);
@@ -1660,7 +1660,7 @@ u32 menu(u16 *original_screen)
     clear_screen(COLOR_BG);
 
 #ifndef GP2X_BUILD
-    blit_to_screen(original_screen, 240, 160, 230, 40);
+    //blit_to_screen(original_screen, 240, 160, 230, 40);
 #endif
 
     current_menu = new_menu;
@@ -1679,12 +1679,12 @@ u32 menu(u16 *original_screen)
   }
 
   menu_update_clock();
-  video_resolution_large();
+  //video_resolution_large();
 
 #ifndef GP2X_BUILD
   SDL_LockMutex(sound_mutex);
 #endif
-  SDL_PauseAudio(1);
+  //SDL_PauseAudio(1);
 
 #ifndef GP2X_BUILD
   SDL_UnlockMutex(sound_mutex);
@@ -1837,7 +1837,7 @@ u32 menu(u16 *original_screen)
   menu_get_clock_speed();
   set_clock_speed();
 
-  SDL_PauseAudio(0);
+  //SDL_PauseAudio(0);
   num_skipped_frames = 100;
 
   return return_value;
