@@ -19,15 +19,6 @@
 
 #include "common.h"
 
-#ifdef PSP_BUILD
-
-//PSP_MODULE_INFO("gpSP", 0x1000, 0, 6);
-//PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER);
-
-void vblank_interrupt_handler(u32 sub, u32 *parg);
-
-#endif
-
 timer_type timer[4];
 
 //debug_state current_debug_state = COUNTDOWN_BREAKPOINT;
@@ -38,13 +29,8 @@ debug_state current_debug_state = RUN;
 
 //u32 breakpoint_value = 0;
 
-#if defined(RPI_BUILD)
-frameskip_type current_frameskip_type = manual_frameskip; //manual; //auto_frameskip;
-u32 global_cycles_per_instruction = 1;
-#else
 frameskip_type current_frameskip_type = auto_frameskip;
 u32 global_cycles_per_instruction = 1;
-#endif
 
 u32 random_skip = 0;
 u32 fps_debug = 0;
@@ -137,19 +123,14 @@ void trigger_ext_event();
     }                                                                         \
   }                                                                           \
 
-static const char *file_ext[] = { ".gba", ".bin", ".zip", NULL };
-
-#ifndef PSP_BUILD
 static void ChangeWorkingDirectory(char *exe)
 {
-#ifndef _WIN32_WCE
   char *s = strrchr(exe, '/');
   if (s != NULL) {
     *s = '\0';
     chdir(exe);
     *s = '/';
   }
-#endif
 }
 
 static void switch_to_romdir(void)
@@ -189,11 +170,6 @@ static void save_romdir(void)
     file_close(romdir_file);
   }
 }
-#else
-void ChangeWorkingDirectory(char *exe) {}
-static void switch_to_romdir(void) {}
-static void save_romdir(void) {}
-#endif
 
 void init_main()
 {
@@ -229,12 +205,6 @@ int main(int argc, char *argv[])
   char bios_filename[512];
   int ret;
 
-#ifdef PSP_BUILD
-  sceKernelRegisterSubIntrHandler(PSP_VBLANK_INT, 0,
-   vblank_interrupt_handler, NULL);
-  sceKernelEnableSubIntr(PSP_VBLANK_INT, 0);
-#endif
-
   init_gamepak_buffer();
 
   // Copy the directory path of the executable into main_path
@@ -244,13 +214,7 @@ int main(int argc, char *argv[])
 
   getcwd(main_path, 512);
 
-#ifdef PSP_BUILD
-  delay_us(2500000);
-#endif
-
-#ifndef PC_BUILD
   gpsp_plat_init();
-#endif
   load_config_file();
 
   gamepak_filename[0] = 0;
@@ -281,11 +245,7 @@ int main(int argc, char *argv[])
     debug_screen_printl("a860e8c0b6d573d191e4ec7db1b1e4f6                  ");
     debug_screen_printl("                                                  ");
     debug_screen_printl("When you do get it name it gba_bios.bin and put it");
-#ifdef PND_BUILD
-    debug_screen_printl("in <SD card>/pandora/appdata/gpsp/ .              ");
-#else
     debug_screen_printl("in the same directory as gpSP.                    ");
-#endif
     debug_screen_printl("                                                  ");
     debug_screen_printl("Press any button to exit.                         ");
 
@@ -336,9 +296,7 @@ int main(int argc, char *argv[])
   {
     if(load_gamepak(argv[1]) == -1)
     {
-#ifndef PSP_BUILD
       printf("Failed to load gamepak %s, exiting.\n", argv[1]);
-#endif
       exit(-1);
     }
 
@@ -362,9 +320,7 @@ int main(int argc, char *argv[])
     {
       if(load_gamepak(load_filename) == -1)
       {
-#ifndef PSP_BUILD
         printf("Failed to load gamepak %s, exiting.\n", load_filename);
-#endif
         exit(-1);
       }
 
@@ -380,10 +336,6 @@ int main(int argc, char *argv[])
   last_frame = 0;
 
   // We'll never actually return from here.
-
-#ifdef PSP_BUILD
-  execute_arm_translate(execute_cycles);
-#else
 
 /*  u8 current_savestate_filename[512];
   get_savestate_filename_noshot(savestate_slot,
@@ -402,7 +354,6 @@ int main(int argc, char *argv[])
 
   execute_arm_translate(execute_cycles);
   execute_arm(execute_cycles);
-#endif
   return 0;
 }
 
@@ -634,18 +585,6 @@ u32 update_gba()
           dispstat &= ~0x01;
           frame_ticks++;
 
-  #ifdef PC_BUILD
-/*        printf("frame update (%x), %d instructions total, %d RAM flushes\n",
-           reg[REG_PC], instruction_count - last_frame, flush_ram_count);
-          last_frame = instruction_count;
-*/
-/*          printf("%d gbc audio updates\n", gbc_update_count);
-          printf("%d oam updates\n", oam_update_count); */
-          gbc_update_count = 0;
-          oam_update_count = 0;
-          flush_ram_count = 0;
-  #endif
-
           if(update_input())
             continue;
 
@@ -711,91 +650,6 @@ u32 update_gba()
 
   return execute_cycles;
 }
-
-#ifdef PSP_BUILD
-
-u32 real_frame_count = 0;
-u32 virtual_frame_count = 0;
-u32 num_skipped_frames = 0;
-
-void vblank_interrupt_handler(u32 sub, u32 *parg)
-{
-  real_frame_count++;
-}
-
-void synchronize()
-{
-  char char_buffer[64];
-  u64 new_ticks, time_delta;
-  s32 used_frameskip = frameskip_value;
-
-  if(!synchronize_flag)
-  {
-    used_frameskip = 4;
-    virtual_frame_count = real_frame_count - 1;
-  }
-
-  skip_next_frame = 0;
-
-  virtual_frame_count++;
-
-  if(real_frame_count >= virtual_frame_count)
-  {
-    if((real_frame_count > virtual_frame_count) &&
-     (current_frameskip_type == auto_frameskip) &&
-     (num_skipped_frames < frameskip_value))
-    {
-      skip_next_frame = 1;
-      num_skipped_frames++;
-    }
-    else
-    {
-      virtual_frame_count = real_frame_count;
-      num_skipped_frames = 0;
-    }
-
-    // Here so that the home button return will eventually work.
-    // If it's not running fullspeed anyway this won't really hurt
-    // it much more.
-
-    delay_us(1);
-  }
-  else
-  {
-    if(synchronize_flag)
-      sceDisplayWaitVblankStart();
-  }
-
-  if(current_frameskip_type == manual_frameskip)
-  {
-    frameskip_counter = (frameskip_counter + 1) %
-     (used_frameskip + 1);
-    if(random_skip)
-    {
-      if(frameskip_counter != (rand() % (used_frameskip + 1)))
-        skip_next_frame = 1;
-    }
-    else
-    {
-      if(frameskip_counter)
-        skip_next_frame = 1;
-    }
-  }
-
-/*  sprintf(char_buffer, "%08d %08d %d %d %d\n",
-   real_frame_count, virtual_frame_count, num_skipped_frames,
-   real_frame_count - virtual_frame_count, skip_next_frame);
-  print_string(char_buffer, 0xFFFF, 0x0000, 0, 10); */
-
-/*
-    sprintf(char_buffer, "%02d %02d %06d %07d", frameskip, (u32)ms_needed,
-     ram_translation_ptr - ram_translation_cache, rom_translation_ptr -
-     rom_translation_cache);
-    print_string(char_buffer, 0xFFFF, 0x0000, 0, 0);
-*/
-}
-
-#else
 
 u32 real_frame_count = 0;
 u32 virtual_frame_count = 0;
@@ -887,8 +741,6 @@ void synchronize()
 #endif
 }
 
-#endif
-
 void quit()
 {
   save_romdir();
@@ -902,17 +754,11 @@ void quit()
   print_register_usage();
 #endif
 
-#ifdef PSP_BUILD
-  sceKernelExitGame();
-#else
   SDL_Quit();
 
-#ifndef PC_BUILD
   gpsp_plat_quit();
-#endif
 
   exit(0);
-#endif
 }
 
 void reset_gba()
