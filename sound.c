@@ -19,7 +19,6 @@
 
 
 #include "common.h"
-#include <SDL.h>
 u32 global_enable_audio = 1;
 
 direct_sound_struct direct_sound_channel[2];
@@ -726,7 +725,7 @@ void sound_exit()
 {
   gbc_sound_buffer_index =
    (sound_buffer_base + audio_buffer_size) % BUFFER_SIZE;
-  SDL_PauseAudio(1);
+  //SDL_PauseAudio(1); // Causes a hang on shutdown.
   sound_exit_flag = 1;
   SDL_CondSignal(sound_cv);
   SDL_CloseAudio();

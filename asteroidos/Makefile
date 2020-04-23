@@ -18,7 +18,7 @@ BIN       = gpsp
 VPATH      += .. ../arm
 CFLAGS     += -DARM_ARCH -DASTEROID_BUILD -DQCOM_BSP -DHWC_PLUGIN_HAVE_HWCOMPOSER1_API  -Wall
 CFLAGS     += -O3 -marm -mcpu=cortex-a7
-CFLAGS     += `pkg-config sdl --cflags`
+CFLAGS     += `pkg-config sdl2 --cflags`
 CFLAGS+=-Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed
 INCFLAGSCLUDES+=`pkg-config android-headers --cflags`
 CFLAGS+=`pkg-config libhardware --cflags`
@@ -30,7 +30,7 @@ CXXFLAGS += $(CFLAGS) -fpermissive
 
 # expecting to have PATH set up to get correct sdl-config first
 
-LIBS       += `pkg-config sdl --libs`
+LIBS       += `pkg-config sdl2 --libs`
 LIBS       += -ldl -lz
 LIBS +=-lpthread
 LIBS +=`pkg-config libsync --libs`

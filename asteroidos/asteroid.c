@@ -55,30 +55,12 @@ static uint16_t * video_buff;
 void gpsp_plat_init(void)
 {
   int ret;
-  ret = SDL_Init(SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_NOPARACHUTE);
+  ret = SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_NOPARACHUTE);
+  SDL_GameControllerEventState(SDL_ENABLE);
   if (ret != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     exit(1);
   }
-  /*int ret, w, h, fd;
-  //const char *layer_fb_name;
-  SDL_Surface* myVideoSurface;
-
-  //bcm_host_init();
-
-  ret = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_NOPARACHUTE);
-  if (ret != 0) {
-    fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-    exit(1);
-  }
-
-  myVideoSurface = SDL_SetVideoMode( 0, 0, 16,  SDL_SWSURFACE);
-    // Print out some information about the video surface
-    if (myVideoSurface == NULL) {
-	fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-	exit(1);
-    }
-  SDL_ShowCursor(0);*/
   fb_set_mode(240, 160, 0, 0, 0, 0);
   screen_scale = 3;
 }

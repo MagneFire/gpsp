@@ -64,70 +64,135 @@ button_repeat_state_type button_repeat_state = BUTTON_NOT_HELD;
 u32 button_repeat = 0;
 gui_action_type cursor_repeat = CURSOR_NONE;
 
-SDL_Joystick *joystick;
+SDL_GameController *joystick;
 
+
+u32 gui_joy_map(u32 button)
+{
+  switch(button)
+  {
+    case SDL_CONTROLLER_BUTTON_A:
+    case SDL_CONTROLLER_BUTTON_START:
+      return CURSOR_SELECT;
+    case SDL_CONTROLLER_BUTTON_BACK:
+    case SDL_CONTROLLER_BUTTON_GUIDE:
+    case SDL_CONTROLLER_BUTTON_B:
+    case SDL_CONTROLLER_BUTTON_X:
+    case SDL_CONTROLLER_BUTTON_Y:
+      return CURSOR_EXIT;
+    case SDL_CONTROLLER_BUTTON_DPAD_UP:
+      return CURSOR_UP;
+    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+      return CURSOR_DOWN;
+    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+      return CURSOR_LEFT;
+    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+      return CURSOR_RIGHT;
+    default:
+      return CURSOR_NONE;
+  }
+}
 
 gui_action_type get_gui_input()
 {
-  s16 axis;
+  SDL_Event event;
+  gui_action_type gui_action = CURSOR_NONE;
+
   delay_us(30000);
 
-  SDL_JoystickUpdate();
-
-  for (unsigned int i=0; i < SDL_JoystickNumAxes(joystick); ++i) {
-    axis = SDL_JoystickGetAxis(joystick, i);
-
-    if (axis < -3200) {
-      return CURSOR_EXIT;
-    } else if (axis > 3200) {
-      return CURSOR_EXIT;
+  while(SDL_PollEvent(&event))
+  {
+    switch(event.type) {
+    case SDL_CONTROLLERBUTTONDOWN:
+      gui_action = gui_joy_map(event.cbutton.button);
+      break;
+    case SDL_CONTROLLERAXISMOTION:
+      if (event.caxis.axis==SDL_CONTROLLER_AXIS_LEFTX) { //Left-Right
+        if (event.caxis.value < -3200)  gui_action = CURSOR_LEFT;
+        else if (event.caxis.value > 3200)  gui_action = CURSOR_RIGHT;
+      }
+      if (event.caxis.axis==SDL_CONTROLLER_AXIS_LEFTY) {  //Up-Down
+        if (event.caxis.value < -3200)  gui_action = CURSOR_UP;
+        else if (event.caxis.value > 3200)  gui_action = CURSOR_DOWN;
+      }
+      break;
+    default:
+      break;
     }
   }
+  return gui_action;
+}
 
-  for (unsigned int i=0; i < SDL_JoystickNumButtons(joystick); ++i) {
-    if (SDL_JoystickGetButton(joystick, i)) {
-      return CURSOR_EXIT;
-    }
+
+u32 joy_map(u32 button)
+{
+  switch(button)
+  {
+    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+      return BUTTON_L;
+    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+      return BUTTON_R;
+    case SDL_CONTROLLER_BUTTON_START:
+      return BUTTON_START;
+    case SDL_CONTROLLER_BUTTON_BACK:
+    case SDL_CONTROLLER_BUTTON_GUIDE:
+      return BUTTON_SELECT;
+    case SDL_CONTROLLER_BUTTON_B:
+      return BUTTON_B;
+    case SDL_CONTROLLER_BUTTON_A:
+      return BUTTON_A;
+    case SDL_CONTROLLER_BUTTON_DPAD_UP:
+      return BUTTON_UP;
+    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+      return BUTTON_DOWN;
+    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+      return BUTTON_LEFT;
+    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+      return BUTTON_RIGHT;
+    default:
+      return BUTTON_NONE;
   }
-
-  return CURSOR_NONE;
 }
 
 u32 update_input()
 {
-  s16 axis_input[2];
   u32 new_key = 0;
-  SDL_JoystickUpdate();
-  axis_input[0] = SDL_JoystickGetAxis(joystick, 0);
-  axis_input[1] = SDL_JoystickGetAxis(joystick, 1);
 
-  new_key &= ~(BUTTON_LEFT|BUTTON_RIGHT);
-  if (axis_input[0] < -3200)  new_key |= BUTTON_LEFT;
-  else if (axis_input[0] > 3200)  new_key |= BUTTON_RIGHT;
-  new_key &= ~(BUTTON_UP|BUTTON_DOWN);
-  if (axis_input[1] < -3200)  new_key |= BUTTON_UP;
-  else if (axis_input[1] > 3200)  new_key |= BUTTON_DOWN;
+  SDL_Event event;
 
-  if (SDL_JoystickGetButton(joystick, 1)) {
-    new_key |= BUTTON_A;
-  }
-  if (SDL_JoystickGetButton(joystick, 0)) {
-    new_key |= BUTTON_B;
-  }
-  if (SDL_JoystickGetButton(joystick, 4)) {
-    new_key |= BUTTON_START;
-  }
-  if (SDL_JoystickGetButton(joystick, 3)) {
-    new_key |= BUTTON_SELECT;
-  }
-  if (SDL_JoystickGetButton(joystick, 11)) {
-    quit();
-  }
+  while(SDL_PollEvent(&event))
+  {
+    switch(event.type) {
+      case SDL_CONTROLLERAXISMOTION:
+        if (event.caxis.axis==SDL_CONTROLLER_AXIS_LEFTX) { //Left-Right
+          key &= ~(BUTTON_LEFT|BUTTON_RIGHT);
+          if (event.caxis.value < -3200)  key |= BUTTON_LEFT;
+          else if (event.caxis.value > 3200)  key |= BUTTON_RIGHT;
+        }
+        if (event.caxis.axis==SDL_CONTROLLER_AXIS_LEFTY) {  //Up-Down
+          key &= ~(BUTTON_UP|BUTTON_DOWN);
+          if (event.caxis.value < -3200)  key |= BUTTON_UP;
+          else if (event.caxis.value > 3200)  key |= BUTTON_DOWN;
+        }
+        break;
+      case SDL_CONTROLLERBUTTONDOWN:
+        if (event.cbutton.button == SDL_CONTROLLER_BUTTON_Y) {
+          u16 *screen_copy = copy_screen();
+          u32 ret_val = menu(screen_copy);
+          free(screen_copy);
 
-  if((new_key | key) != key)
-    trigger_key(new_key);
-
-  key = new_key;
+          return ret_val;
+        }
+        key |= joy_map(event.cbutton.button);
+        trigger_key(key);
+        break;
+      case SDL_CONTROLLERBUTTONUP:
+        key &= ~(joy_map(event.cbutton.button));
+        break;
+      default:
+        break;
+    }
+  }
 
   io_registers[REG_P1] = (~key) & 0x3FF;
 
@@ -141,10 +206,9 @@ void init_input()
 
   if(joystick_count > 0)
   {
-    joystick = SDL_JoystickOpen(0);
-    SDL_JoystickEventState(SDL_ENABLE);
+    joystick = SDL_GameControllerOpen(0);
 
-    printf("Joystick Name: %s\n", SDL_JoystickName(0));
+    printf("Gamecontroller Name: %s\n", SDL_GameControllerName(joystick));
   }
 }
 
