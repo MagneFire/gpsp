@@ -201,12 +201,13 @@ u32 update_input()
 
 void init_input()
 {
+  char joystick_active[20];
   u32 joystick_count = SDL_NumJoysticks();
   printf("Number of joysticks found: %d\r\n", joystick_count);
 
-  if(joystick_count > 0)
-  {
-    joystick = SDL_GameControllerOpen(0);
+  sprintf(joystick_active, getenv("JOYSTICK_ACTIVE"));
+  if (joystick_active[0] != '\0') {
+    joystick = SDL_GameControllerOpen(atoi(joystick_active));
 
     printf("Gamecontroller Name: %s\n", SDL_GameControllerName(joystick));
   }
