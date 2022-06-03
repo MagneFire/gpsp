@@ -61,15 +61,7 @@ static const char* fragment_shader =
 	"{														\n"
 	"	gl_FragColor = texture2D(u_texture, v_texcoord);	\n"
 	"}														\n";
-/*
-static const GLfloat vertices[] =
-{
-	-0.5f, -0.5f, 0.0f,
-	+0.5f, -0.5f, 0.0f,
-	+0.5f, +0.5f, 0.0f,
-	-0.5f, +0.5f, 0.0f,
-};
-*/
+
 static const GLfloat vertices[] =
 {
 	-0.5f, -0.5f, 0.0f,
@@ -194,7 +186,6 @@ typedef	struct ShaderInfo {
 } ShaderInfo;
 
 static ShaderInfo shader;
-static ShaderInfo shader_filtering;
 static GLuint buffers[3];
 static GLuint textures[2];
 
