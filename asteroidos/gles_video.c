@@ -70,7 +70,7 @@ static const GLfloat vertices[] =
 	+0.5f, -0.5f, 0.0f,
 };
 
-#define	TEX_WIDTH	1024
+#define	TEX_WIDTH	512
 #define	TEX_HEIGHT	512
 
 static GLfloat uvs[8];
