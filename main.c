@@ -223,11 +223,14 @@ int main(int argc, char *argv[])
 
   init_input();
 
-  sprintf(bios_filename, getenv("GBA_BIOS"));
+  char* bios_file_name_p = getenv("GBA_BIOS");
   // Check if a gba_bios.bin path was supplied via environment variable, if not check in exec path.
-  if (bios_filename[0] == '\0') {
+  if (bios_file_name_p == NULL) {
     sprintf(bios_filename, "%s" PATH_SEPARATOR "%s", main_path, "gba_bios.bin");
+  } else {
+    sprintf(bios_filename, bios_file_name_p);
   }
+
   ret = load_bios(bios_filename);
   if (ret != 0)
     ret = load_bios("gba_bios.bin");
@@ -308,11 +311,11 @@ int main(int argc, char *argv[])
   }
   else
   {
-    char load_filename[512];
+    char* load_filename;
     switch_to_romdir();
 
-    sprintf(load_filename, getenv("GAME_PATH"));
-    if (load_filename[0] == '\0')
+    load_filename = getenv("GAME_PATH");
+    if (load_filename == NULL)
     {
         exit(-1);
     }

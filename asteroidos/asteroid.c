@@ -56,7 +56,7 @@ void gpsp_plat_init(void)
 {
   int ret;
   char joystick_map[512];
-  char joystick_active[20];
+  char* joystick_active;
   ret = SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO);
   SDL_GameControllerEventState(SDL_ENABLE);
   if (ret != 0) {
@@ -64,12 +64,13 @@ void gpsp_plat_init(void)
     exit(1);
   }
 
-  sprintf(joystick_active, getenv("JOYSTICK_ACTIVE"));
-  if (joystick_active[0] != '\0') {
+  joystick_active = getenv("JOYSTICK_ACTIVE");
+  if (joystick_active != NULL) {
     strcpy(joystick_map, "JOYSTICK_MAP");
     strcat(joystick_map, joystick_active);
-    sprintf(joystick_map, getenv(joystick_map));
-    if (joystick_map[0] != '\0') {
+    char* joystick_map_env = getenv(joystick_map);
+    if (joystick_map_env != NULL) {
+      sprintf(joystick_map, "%s", joystick_map_env);
       SDL_GameControllerAddMapping(joystick_map);
     }
   }

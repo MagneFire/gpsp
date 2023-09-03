@@ -2013,6 +2013,7 @@ s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_make
   char current_variable[256];
   char current_value[256];
   char config_path[512];
+  char* config_path_env;
   FILE *config_file;
 
   idle_loop_target_pc = 0xFFFFFFFF;
@@ -2022,10 +2023,12 @@ s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_make
   translation_gate_targets = 0;
   flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
 
-  sprintf(config_path, getenv("GAME_CONFIG"));
+  config_path_env = getenv("GAME_CONFIG");
   // Check if a gba_bios.bin path was supplied via environment variable, if not check in exec path.
-  if (config_path[0] == '\0') {
+  if (config_path_env == NULL) {
     sprintf(config_path, "%s" PATH_SEPARATOR "%s", main_path, CONFIG_FILENAME);
+  } else {
+    sprintf(config_path, config_path_env);
   }
   config_file = fopen(config_path, "rb");
 
