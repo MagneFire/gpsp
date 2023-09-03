@@ -70,7 +70,7 @@ void gpsp_plat_init(void)
     strcat(joystick_map, joystick_active);
     char* joystick_map_env = getenv(joystick_map);
     if (joystick_map_env != NULL) {
-      sprintf(joystick_map, "%s", joystick_map_env);
+      sprintf(joystick_map, "%s,", joystick_map_env);
       SDL_GameControllerAddMapping(joystick_map);
     }
   }
