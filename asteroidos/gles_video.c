@@ -249,14 +249,22 @@ void video_init(uint32_t _width, uint32_t _height, uint32_t filter)
 
 	gles2_create();
 
-	int rr=(screen_height*10/frame_height);
-	int h = (frame_height*rr)/10;
-	int w = (frame_width*rr)/10;
+	float rr=((float)screen_height/(float)frame_height);
+	int h = screen_height;
+	int w = (frame_width*rr);
 	if (w>screen_width) {
-	    rr = (screen_width*10/frame_width);
-	    h = (frame_height*rr)/10;
-	    w = (frame_width*rr)/10;
+	    rr = ((float)screen_width/(float)frame_width);
+	    h = (frame_height*rr);
+	    w = screen_width;
 	}
+
+	char* round_display = getenv("ROUND");
+	if (round_display != NULL) {
+		// Scale slightly on round displays.
+		w*= 0.95;
+		h*= 0.95;
+	}
+
 	glViewport((screen_width-w)/2, (screen_height-h)/2, w, h);
 	SetOrtho(proj, -0.5f, +0.5f, +0.5f, -0.5f, -1.0f, 1.0f, 1.0f ,1.0f );
 	video_set_filter(filter);
