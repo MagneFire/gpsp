@@ -22,8 +22,7 @@
 #include <sys/stat.h>
 #include "gles_video.h"
 #include "asteroid.h"
-
-
+#include "displayblanking.h"
 
 u32 gamepad_config_map[PLAT_BUTTON_COUNT] =
 {
@@ -46,11 +45,10 @@ u32 gamepad_config_map[PLAT_BUTTON_COUNT] =
   BUTTON_ID_MENU                // Space
 };
 
-
 #define MAX_VIDEO_MEM (480*270*2)
 static int video_started=0;
 static uint16_t * video_buff;
-
+uint16_t displayblanking_timer = 0;
 
 void gpsp_plat_init(void)
 {
@@ -87,11 +85,18 @@ void gpsp_plat_quit(void)
     video_started=0;
   }
   SDL_Quit();
+  displayblanking_exit();
 }
-
 
 void *fb_flip_screen(void)
 {
+  // Keep display active by sending mce inhibit commands.
+  if (!displayblanking_timer) {
+    displayblanking_prevent();
+  }
+  displayblanking_timer++;
+  displayblanking_timer %= 15*60;
+
   video_draw(video_buff);
   return video_buff;
 }
