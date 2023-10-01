@@ -64,9 +64,6 @@ button_repeat_state_type button_repeat_state = BUTTON_NOT_HELD;
 u32 button_repeat = 0;
 gui_action_type cursor_repeat = CURSOR_NONE;
 
-SDL_GameController *joystick;
-
-
 u32 gui_joy_map(u32 button)
 {
   switch(button)
@@ -203,13 +200,34 @@ void init_input()
 {
   char* joystick_active;
   u32 joystick_count = SDL_NumJoysticks();
+  char guid_string[40];
   printf("Number of joysticks found: %d\r\n", joystick_count);
+  printf("Total mappings: %d\r\n", SDL_GameControllerNumMappings());
 
-  joystick_active = getenv("JOYSTICK_ACTIVE");
-  if (joystick_active != NULL) {
-    joystick = SDL_GameControllerOpen(atoi(joystick_active));
+  for (int i=0; i < joystick_count; i++) {
+    SDL_GameController *gamecontroller = SDL_GameControllerOpen(i);
 
-    printf("Gamecontroller Name: %s\n", SDL_GameControllerName(joystick));
+    SDL_JoystickGUID joystick_guid = SDL_JoystickGetDeviceGUID(i);
+    memset(guid_string, 0, sizeof(guid_string[0]) * 40);
+    SDL_JoystickGetGUIDString(joystick_guid, guid_string, 40);
+
+    printf("Joystick Name: %s\n", SDL_JoystickNameForIndex(i));
+    printf("  GUID: %s\n", guid_string);
+    printf("  IsGameController: %d\n", SDL_IsGameController(i));
+
+    SDL_JoystickGUID gamecontroller_guid = SDL_JoystickGetGUID(gamecontroller);
+    const char * mapping = SDL_GameControllerMappingForGUID(joystick_guid);
+
+    memset(guid_string, 0, sizeof(guid_string[0]) * 40);
+    SDL_JoystickGetGUIDString(gamecontroller_guid, guid_string, 40);
+
+    printf("Gamecontroller Name: %s\n", SDL_GameControllerName(gamecontroller));
+    printf("  GUID: %s\n", guid_string);
+    printf("  GameControllerPath: %s\n", SDL_GameControllerPath(gamecontroller));
+    printf("  Serial: %s\n", SDL_GameControllerGetSerial(gamecontroller));
+    printf("  Vid Pid: %d-%d\n", SDL_GameControllerGetVendor(gamecontroller), SDL_GameControllerGetProduct(gamecontroller));
+    printf("  Mapping: %s\n", mapping);
+    printf("\n");
   }
 }
 
