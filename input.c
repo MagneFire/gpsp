@@ -113,6 +113,9 @@ gui_action_type get_gui_input()
         else if (event.caxis.value > 3200)  gui_action = CURSOR_DOWN;
       }
       break;
+    case SDL_QUIT:
+      quit();
+      break;
     default:
       break;
     }
@@ -185,6 +188,9 @@ u32 update_input()
         break;
       case SDL_CONTROLLERBUTTONUP:
         key &= ~(joy_map(event.cbutton.button));
+        break;
+      case SDL_QUIT:
+        quit();
         break;
       default:
         break;
