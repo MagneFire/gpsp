@@ -156,8 +156,6 @@ u32 joy_map(u32 button)
 
 u32 update_input()
 {
-  u32 new_key = 0;
-
   SDL_Event event;
 
   while(SDL_PollEvent(&event))
