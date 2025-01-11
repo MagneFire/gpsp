@@ -219,7 +219,7 @@ void init_input()
     printf("  GUID: %s\n", guid_string);
     printf("  IsGameController: %d\n", SDL_IsGameController(i));
 
-    SDL_JoystickGUID gamecontroller_guid = SDL_JoystickGetGUID(gamecontroller);
+    SDL_JoystickGUID gamecontroller_guid = SDL_JoystickGetGUID((SDL_Joystick *)gamecontroller);
     const char * mapping = SDL_GameControllerMappingForGUID(joystick_guid);
 
     memset(guid_string, 0, sizeof(guid_string[0]) * 40);
