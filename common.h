@@ -31,6 +31,10 @@
   #define PATH_SEPARATOR_CHAR '/'
 #endif
 
+#ifndef _DEFAULT_SOURCE
+  #define _DEFAULT_SOURCE
+#endif
+
 #ifdef ARM_ARCH
 
 #define _BSD_SOURCE // sync
