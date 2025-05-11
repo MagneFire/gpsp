@@ -156,8 +156,6 @@ u32 joy_map(u32 button)
 
 u32 update_input()
 {
-  u32 new_key = 0;
-
   SDL_Event event;
 
   while(SDL_PollEvent(&event))
@@ -204,7 +202,6 @@ u32 update_input()
 
 void init_input()
 {
-  char* joystick_active;
   u32 joystick_count = SDL_NumJoysticks();
   char guid_string[40];
   printf("Number of joysticks found: %d\r\n", joystick_count);
@@ -221,7 +218,9 @@ void init_input()
     printf("  GUID: %s\n", guid_string);
     printf("  IsGameController: %d\n", SDL_IsGameController(i));
 
-    SDL_JoystickGUID gamecontroller_guid = SDL_JoystickGetGUID(gamecontroller);
+    SDL_Joystick* joystick = SDL_GameControllerGetJoystick(gamecontroller);
+    SDL_JoystickGUID gamecontroller_guid = SDL_JoystickGetGUID(joystick);
+
     const char * mapping = SDL_GameControllerMappingForGUID(joystick_guid);
 
     memset(guid_string, 0, sizeof(guid_string[0]) * 40);
