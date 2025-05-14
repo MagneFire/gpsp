@@ -38,6 +38,8 @@ void hwcomposer_init() {
 
 	EGLBoolean rv;
 
+	SDL_GL_LoadLibrary(NULL);
+
 	SDL_Window* win = SDL_CreateWindow("GPSP", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 200, 200, SDL_WINDOW_FULLSCREEN);
 
 	SDL_GetWindowSize(win, (int*)&screen_width, (int*)&screen_height);

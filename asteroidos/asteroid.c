@@ -54,7 +54,7 @@ void gpsp_plat_init(void)
 {
   int ret;
   char joystick_map[512];
-  ret = SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO);
+  ret = SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO | SDL_WINDOW_OPENGL);
   SDL_GameControllerEventState(SDL_ENABLE);
   if (ret != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
